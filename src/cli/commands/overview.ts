@@ -1,0 +1,133 @@
+import { Command } from "commander";
+import chalk from "chalk";
+import { PulseClient } from "../../core/client.js";
+import { log, formatDuration } from "../../utils/logger.js";
+import type { OverviewResponse, ServiceState } from "../../core/models.js";
+
+function timeSince(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 0) return "just now";
+  return formatDuration(diff) + " ago";
+}
+
+function statusIndicator(svc: ServiceState): string {
+  switch (svc.severity) {
+    case "ok":
+      return chalk.green("\u25CF");
+    case "warning":
+      return chalk.yellow("\u25B2");
+    case "critical":
+      return chalk.red("\u25CF");
+    default:
+      return chalk.dim("\u25CB");
+  }
+}
+
+function statusLabel(svc: ServiceState): string {
+  switch (svc.severity) {
+    case "ok": {
+      if (svc.active_runs > 0) return chalk.green("active");
+      return chalk.green("ok");
+    }
+    case "warning":
+      return chalk.yellow("stale");
+    case "critical":
+      return chalk.red("dead");
+    default:
+      return chalk.dim(svc.status);
+  }
+}
+
+function pluralize(count: number, word: string): string {
+  return count === 1 ? `${count} ${word}` : `${count} ${word}s`;
+}
+
+export function makeOverviewCommand(): Command {
+  const overview = new Command("overview")
+    .description("Show a quick summary of the agent-pulse system")
+    .action(async () => {
+      const parentOpts = overview.parent?.opts() ?? {};
+      const jsonOutput = parentOpts.json === true;
+
+      const client = new PulseClient({
+        serverUrl: parentOpts.server,
+      });
+
+      try {
+        const data: OverviewResponse = await client.overview();
+
+        if (jsonOutput) {
+          log.json(data);
+          return;
+        }
+
+        const { runs, services } = data;
+
+        // Header
+        console.log("");
+        console.log(chalk.bold.cyan("  agent-pulse overview"));
+        console.log(chalk.dim("  " + "\u2501".repeat(22)));
+        console.log("");
+
+        // Summary counters
+        const active = chalk.bold.green(String(runs.active).padStart(2));
+        const stale = chalk.bold.yellow(String(runs.stale).padStart(2));
+        const dead = chalk.bold.red(String(runs.dead).padStart(2));
+        const completed = chalk.dim(String(runs.completed).padStart(2));
+        const failed = chalk.dim(String(runs.failed).padStart(2));
+
+        console.log(
+          `  ${chalk.dim("Active")}  ${active}    ${chalk.dim("Stale")}  ${stale}    ${chalk.dim("Dead")}  ${dead}`,
+        );
+        console.log(
+          `  ${chalk.dim("Completed")} ${completed}  ${chalk.dim("Failed")} ${failed}`,
+        );
+        console.log("");
+
+        // Services list
+        if (services.length > 0) {
+          console.log(chalk.dim("  Services:"));
+
+          // Find the longest service name for alignment
+          const maxNameLen = Math.max(
+            ...services.map((s) => s.service_name.length),
+            7,
+          );
+
+          for (const svc of services) {
+            const name = svc.service_name.padEnd(maxNameLen);
+            const indicator = statusIndicator(svc);
+            const label = statusLabel(svc);
+            const totalRuns = svc.active_runs + svc.stale_runs + svc.dead_runs;
+            const runCount = chalk.dim(pluralize(totalRuns, "run").padEnd(8));
+            const lastBeat = svc.last_heartbeat
+              ? chalk.dim("last: " + timeSince(svc.last_heartbeat))
+              : chalk.dim("last: never");
+
+            console.log(
+              `    ${chalk.white(name)}  ${indicator} ${label.padEnd(20)}  ${runCount}  ${lastBeat}`,
+            );
+          }
+        } else {
+          console.log(chalk.dim("  No services registered."));
+        }
+
+        console.log("");
+      } catch (error) {
+        if (jsonOutput) {
+          log.json({
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        } else {
+          log.error(
+            `Failed to fetch overview: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          log.dim("Is the server running? Start it with: agent-pulse server start");
+        }
+        process.exit(1);
+      }
+    });
+
+  return overview;
+}

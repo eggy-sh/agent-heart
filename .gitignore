@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.db
+*.sqlite
+.env
+.env.*
+.DS_Store
+*.log
+coverage/
+.agent-pulse/

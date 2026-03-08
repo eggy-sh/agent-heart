@@ -380,7 +380,7 @@ Contributions are welcome.
 
 ```bash
 # Clone and install
-git clone https://github.com/YOUR_ORG/agent-pulse.git
+git clone https://github.com/eggy-sh/agent-pulse.git
 cd agent-pulse
 npm install
 

@@ -236,6 +236,25 @@ Add to your `.claude/settings.json`:
 
 See [docs/hooks/claude-code.md](./docs/hooks/claude-code.md) for the full integration guide.
 
+### Continuous Monitoring with `/loop`
+
+Claude Code's [`/loop`](https://code.claude.com/docs/en/scheduled-tasks) runs a prompt on a recurring interval inside your session. Pair it with agent-pulse and the agent monitors its own work in real time.
+
+```
+# Watch for stuck runs every 3 minutes
+/loop 3m check agent-pulse runs --status stale --json and tell me if anything is stuck
+
+# Watch a specific deploy
+/loop 1m check agent-pulse runs --service agent/deploy and tell me when it finishes
+
+# Full session health check
+/loop 10m run agent-pulse overview --json and summarize active, stale, and dead runs
+```
+
+Hooks record what the agent does. `/loop` watches whether it's going well. See [docs/why-agent-observability.md](./docs/why-agent-observability.md) for why this pattern matters and where the market is headed.
+
+---
+
 ## Architecture
 
 ```
@@ -352,7 +371,7 @@ Because that is where a lot of agent work already happens. The fastest path to o
 ## Inspiration
 
 - [Google Workspace CLI](https://www.npmjs.com/package/@googleworkspace/cli) -- one CLI for humans and AI agents. Demonstrates the shift toward CLI-first resource access.
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) -- hooks-based agent that operates through tool calls. The target integration for agentic observability.
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) -- hooks-based agent that operates through tool calls, with [`/loop`](https://code.claude.com/docs/en/scheduled-tasks) for scheduled background tasks. The target integration for agentic observability.
 - [Healthchecks](https://github.com/healthchecks/healthchecks) -- dead-man-switch heartbeat monitoring. Proven model, but lacks lifecycle semantics.
 
 ## Contributing

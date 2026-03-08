@@ -105,7 +105,7 @@ Key commands:
 TypeScript class for programmatic integration. Same HTTP API as the CLI, but usable from Node.js applications, agent frameworks, and automation scripts.
 
 ```typescript
-import { PulseClient } from "agentpulse";
+import { PulseClient } from "@eggy.sh/agentpulse";
 
 const client = new PulseClient({ serverUrl: "http://127.0.0.1:7778" });
 ```

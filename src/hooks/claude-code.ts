@@ -5,10 +5,10 @@
  * to agent-pulse lifecycle events (lock, beat, unlock).
  *
  * Usage from a Claude Code hook:
- *   echo '$TOOL_INPUT' | npx agentpulse hook claude-code --event pre-tool-use
+ *   echo '$TOOL_INPUT' | npx @eggy.sh/agentpulse hook claude-code --event pre-tool-use
  *
  * Or programmatically:
- *   import { handlePreToolUse } from "agentpulse/hooks/claude-code";
+ *   import { handlePreToolUse } from "@eggy.sh/agentpulse/hooks/claude-code";
  *   await handlePreToolUse(data);
  */
 

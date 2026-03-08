@@ -37,7 +37,7 @@ export function makeExecCommand(): Command {
       if (!opts.service) {
         log.error("--service <name> is required");
         log.dim(
-          "Usage: npx agentpulse exec --service <name> [options] -- <command...>",
+          "Usage: npx @eggy.sh/agentpulse exec --service <name> [options] -- <command...>",
         );
         process.exit(1);
       }
@@ -50,7 +50,7 @@ export function makeExecCommand(): Command {
           "No command specified. Use -- to separate the command to execute.",
         );
         log.dim(
-          "Example: npx agentpulse exec --service github -- gh pr list",
+          "Example: npx @eggy.sh/agentpulse exec --service github -- gh pr list",
         );
         process.exit(1);
       }

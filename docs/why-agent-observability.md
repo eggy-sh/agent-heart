@@ -39,7 +39,7 @@ Claude Code's `/loop` command runs a prompt on a recurring interval inside your 
 Pair that with `agent-pulse` and you get something that didn't exist before: **an agent that monitors its own work in real time.**
 
 ```
-/loop 3m check npx agentpulse runs --status stale --json and tell me if anything is stuck
+/loop 3m check npx @eggy.sh/agentpulse runs --status stale --json and tell me if anything is stuck
 ```
 
 That one line creates a background watcher. Every three minutes, Claude queries agent-pulse, looks for stale or dead runs, and surfaces problems before you notice them yourself. The hooks record what the agent does. The loop watches whether it's going well.
@@ -48,16 +48,16 @@ That one line creates a background watcher. Every three minutes, Claude queries 
 
 ```
 # Catch stuck tool calls early
-/loop 2m check npx agentpulse for stale runs and tell me which service is stuck
+/loop 2m check npx @eggy.sh/agentpulse for stale runs and tell me which service is stuck
 
 # Watch a specific deploy
-/loop 1m check npx agentpulse runs --service agent/deploy and tell me when it finishes
+/loop 1m check npx @eggy.sh/agentpulse runs --service agent/deploy and tell me when it finishes
 
 # Full session health check
-/loop 10m run npx agentpulse overview --json and summarize active, stale, and dead runs
+/loop 10m run npx @eggy.sh/agentpulse overview --json and summarize active, stale, and dead runs
 
 # One-shot reminder (not recurring)
-in 30 minutes, run npx agentpulse overview and tell me if the deploy completed
+in 30 minutes, run npx @eggy.sh/agentpulse overview and tell me if the deploy completed
 ```
 
 ### How `/loop` Works
@@ -82,7 +82,7 @@ Maximum 50 scheduled tasks per session.
 **Step 2:** At the start of a work session, set up a monitoring loop:
 
 ```
-/loop 3m check npx agentpulse for stale or dead runs and warn me
+/loop 3m check npx @eggy.sh/agentpulse for stale or dead runs and warn me
 ```
 
 **Step 3:** Work normally. Every Bash command, file read, file write, grep, and agent spawn is recorded. The loop watches for problems in the background.
@@ -90,7 +90,7 @@ Maximum 50 scheduled tasks per session.
 **Step 4:** At the end of the session, ask for a summary:
 
 ```
-run npx agentpulse overview --json and summarize this session -- what tools were used, how many succeeded, and were there any issues?
+run npx @eggy.sh/agentpulse overview --json and summarize this session -- what tools were used, how many succeeded, and were there any issues?
 ```
 
 The combination of hooks (tracking) plus `/loop` (watching) is the first version of what continuous agent observability looks like in practice. And it works today.

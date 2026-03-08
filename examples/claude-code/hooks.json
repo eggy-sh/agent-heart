@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event session-start"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event session-start"
           }
         ]
       }
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event pre-tool-use"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event pre-tool-use"
           }
         ]
       }
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event post-tool-use"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event post-tool-use"
           }
         ]
       }
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event session-end"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event session-end"
           }
         ]
       }

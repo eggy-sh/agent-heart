@@ -1,5 +1,5 @@
 {
-  "name": "agentpulse",
+  "name": "@eggy.sh/agentpulse",
   "version": "0.1.0",
   "description": "CLI-first observability layer for AI agents — lifecycle tracking, stuck-run detection, and resource-level health signals for agentic tool calls",
   "type": "module",

@@ -20,8 +20,8 @@ Hooks are configured in `.claude/settings.json` (project-level) or `~/.claude/se
 ### 1. Start the server
 
 ```bash
-npx agentpulse init
-npx agentpulse server start
+npx @eggy.sh/agentpulse init
+npx @eggy.sh/agentpulse server start
 ```
 
 ### 2. Add hooks to your Claude Code settings
@@ -37,7 +37,7 @@ Create or edit `.claude/settings.json` in your project root:
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event session-start"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event session-start"
           }
         ]
       }
@@ -48,7 +48,7 @@ Create or edit `.claude/settings.json` in your project root:
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event pre-tool-use"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event pre-tool-use"
           }
         ]
       }
@@ -59,7 +59,7 @@ Create or edit `.claude/settings.json` in your project root:
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event post-tool-use"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event post-tool-use"
           }
         ]
       }
@@ -70,7 +70,7 @@ Create or edit `.claude/settings.json` in your project root:
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event session-end"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event session-end"
           }
         ]
       }
@@ -100,7 +100,7 @@ That is it. Every tool call in your Claude Code session will now be tracked by `
 After a Claude Code session that read a file and ran a bash command:
 
 ```bash
-$ npx agentpulse status
+$ npx @eggy.sh/agentpulse status
 
 SERVICE                STATUS    RUNS  STALE  DEAD
 claude-code/session    active       1      0     0
@@ -130,7 +130,7 @@ For long-running sessions, you can add a heartbeat that fires on every tool call
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event session-start"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event session-start"
           }
         ]
       }
@@ -141,7 +141,7 @@ For long-running sessions, you can add a heartbeat that fires on every tool call
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event pre-tool-use && npx agentpulse beat claude-code/session"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event pre-tool-use && npx @eggy.sh/agentpulse beat claude-code/session"
           }
         ]
       }
@@ -152,7 +152,7 @@ For long-running sessions, you can add a heartbeat that fires on every tool call
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event post-tool-use"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event post-tool-use"
           }
         ]
       }
@@ -163,7 +163,7 @@ For long-running sessions, you can add a heartbeat that fires on every tool call
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event session-end"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event session-end"
           }
         ]
       }
@@ -172,7 +172,7 @@ For long-running sessions, you can add a heartbeat that fires on every tool call
 }
 ```
 
-The `npx agentpulse beat claude-code/session` call in `PreToolUse` ensures the session stays marked `active` as long as the agent is making tool calls. If the agent goes silent (no tool calls for the configured `max_silence_ms`), the session will transition to `stale`.
+The `npx @eggy.sh/agentpulse beat claude-code/session` call in `PreToolUse` ensures the session stays marked `active` as long as the agent is making tool calls. If the agent goes silent (no tool calls for the configured `max_silence_ms`), the session will transition to `stale`.
 
 ## Privacy and Redaction
 
@@ -235,7 +235,7 @@ Use the `matcher` field in your hook config to control which tools are tracked:
         "hooks": [
           {
             "type": "command",
-            "command": "npx agentpulse hook claude-code --event pre-tool-use"
+            "command": "npx @eggy.sh/agentpulse hook claude-code --event pre-tool-use"
           }
         ]
       }
@@ -256,7 +256,7 @@ import {
   handlePreToolUse,
   handlePostToolUse,
   handleSessionEnd,
-} from "agentpulse/hooks/claude-code";
+} from "@eggy.sh/agentpulse/hooks/claude-code";
 
 // In your hook script, read stdin and pass to the handler
 const input = await readStdin();
@@ -271,8 +271,8 @@ See [`src/hooks/claude-code.ts`](../src/hooks/claude-code.ts) for the full imple
 
 **Hook not firing**: Make sure `agent-pulse` is available via `npx`. Test by running the hook command manually.
 
-**Server not reachable**: Ensure `npx agentpulse server start` is running. Check that the port in your config matches (default: 7778).
+**Server not reachable**: Ensure `npx @eggy.sh/agentpulse server start` is running. Check that the port in your config matches (default: 7778).
 
-**No data appearing**: Check `npx agentpulse status` after a session. If the server was not running when hooks fired, events are lost (fire-and-forget by default).
+**No data appearing**: Check `npx @eggy.sh/agentpulse status` after a session. If the server was not running when hooks fired, events are lost (fire-and-forget by default).
 
 **Redaction too aggressive**: Adjust the `redact.patterns` array in your config. Patterns match against flag names and metadata keys, not values directly.

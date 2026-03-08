@@ -123,7 +123,7 @@ export function makeOverviewCommand(): Command {
           log.error(
             `Failed to fetch overview: ${error instanceof Error ? error.message : String(error)}`,
           );
-          log.dim("Is the server running? Start it with: npx agentpulse server start");
+          log.dim("Is the server running? Start it with: npx @eggy.sh/agentpulse server start");
         }
         process.exit(1);
       }

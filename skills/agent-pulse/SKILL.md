@@ -43,8 +43,8 @@ failure, or disappearance — through a simple lock/beat/unlock model.
 Before any integration, agent-pulse needs to be installed and its server running.
 
 ```bash
-npx agentpulse init
-npx agentpulse server start
+npx @eggy.sh/agentpulse init
+npx @eggy.sh/agentpulse server start
 ```
 
 The server runs on `127.0.0.1:7778` by default (SQLite-backed, single process).
@@ -73,7 +73,7 @@ framework.
 The fastest way to add observability to any CLI invocation:
 
 ```bash
-npx agentpulse exec \
+npx @eggy.sh/agentpulse exec \
   --service <runtime>/<family> \
   --tool <binary> \
   --resource <resource_kind> \
@@ -82,7 +82,7 @@ npx agentpulse exec \
 
 **Example:**
 ```bash
-npx agentpulse exec \
+npx @eggy.sh/agentpulse exec \
   --service agent/github \
   --tool gh \
   --resource pulls \
@@ -110,7 +110,7 @@ This automatically:
 For custom integrations, use `PulseClient` directly:
 
 ```typescript
-import { PulseClient } from "agentpulse";
+import { PulseClient } from "@eggy.sh/agentpulse";
 
 const pulse = new PulseClient({
   serverUrl: "http://127.0.0.1:7778",
@@ -152,20 +152,20 @@ After integration, verify everything works:
 
 ```bash
 # Overview of all services
-npx agentpulse overview
+npx @eggy.sh/agentpulse overview
 
 # List recent runs
-npx agentpulse runs
+npx @eggy.sh/agentpulse runs
 
 # Filter by service
-npx agentpulse runs --service claude-code/Bash
+npx @eggy.sh/agentpulse runs --service claude-code/Bash
 
 # Filter by status (find problems)
-npx agentpulse runs --status stale
-npx agentpulse runs --status dead
+npx @eggy.sh/agentpulse runs --status stale
+npx @eggy.sh/agentpulse runs --status dead
 
 # JSON output for automation
-npx agentpulse overview --json
+npx @eggy.sh/agentpulse overview --json
 ```
 
 ## Monitor Configuration
@@ -217,7 +217,7 @@ CLI hook that accepts flags instead of stdin JSON:
 
 ```bash
 # On tool start
-npx agentpulse hook generic \
+npx @eggy.sh/agentpulse hook generic \
   --action lock \
   --service my-agent/tool \
   --tool gh \
@@ -225,7 +225,7 @@ npx agentpulse hook generic \
   --session sess-123
 
 # On tool completion
-npx agentpulse hook generic \
+npx @eggy.sh/agentpulse hook generic \
   --action unlock \
   --service my-agent/tool \
   --tool gh \
@@ -237,14 +237,14 @@ This is the escape hatch for any runtime that can shell out to a CLI.
 
 ## Troubleshooting
 
-**Server not reachable:** Make sure `npx agentpulse server start` is running.
+**Server not reachable:** Make sure `npx @eggy.sh/agentpulse server start` is running.
 Test: `curl http://127.0.0.1:7778/api/v1/health`
 
 **No data after hook fires:** Events are fire-and-forget. Start the server
 before running your agent session.
 
 **Runs stuck as "locked":** The monitor marks them stale/dead after the
-configured thresholds. Check `npx agentpulse runs --status locked`.
+configured thresholds. Check `npx @eggy.sh/agentpulse runs --status locked`.
 
 **Redaction too aggressive:** Adjust `redact.patterns` in your config.
 

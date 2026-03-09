@@ -46,7 +46,7 @@ That is the gap `agent-pulse` is built to fill.
 
 ```
 npx @eggy.sh/agentpulse exec --service github --tool gh --resource pulls \
-  -- gh pr list --repo myorg/myrepo
+  -- gh pr list --repo acme/api
 ```
 
 ## Quickstart
@@ -60,7 +60,7 @@ npx @eggy.sh/agentpulse server start
 
 # Wrap any CLI command with automatic tracking
 npx @eggy.sh/agentpulse exec --service github --tool gh --resource pulls \
-  -- gh pr list --repo myorg/myrepo
+  -- gh pr list --repo acme/api
 
 # Check status
 npx @eggy.sh/agentpulse status
@@ -68,130 +68,92 @@ npx @eggy.sh/agentpulse status
 
 ## CLI Reference
 
-### `agent-pulse exec` -- The Universal Wrapper
+### `exec` -- Wrap Any Command
 
-The hero feature. Wraps any CLI command with automatic lifecycle tracking.
+The fastest path to tracking. Wraps a CLI command with automatic `lock`, periodic `beat`, and `unlock` on exit.
 
 ```bash
-# Basic usage
-npx @eggy.sh/agentpulse exec --service my-service -- <command>
-
-# Full metadata
 npx @eggy.sh/agentpulse exec \
-  --service github \
-  --tool gh \
-  --resource pulls \
-  --session my-session-123 \
-  --meta env=production \
-  -- gh pr list --repo myorg/myrepo
+  --service github --tool gh --resource pulls \
+  -- gh pr list --repo acme/api --state open
+```
 
-# With custom heartbeat interval
+Group related commands into a session:
+
+```bash
 npx @eggy.sh/agentpulse exec \
-  --service k8s \
-  --tool kubectl \
-  --heartbeat-interval 5000 \
-  -- kubectl get pods -n production
+  --service deploy --tool kubectl --resource deployments \
+  --session deploy-v2.3.1 \
+  -- kubectl set image deployment/api api=acme/api:v2.3.1 -n production
 ```
 
-What happens under the hood:
-1. Sends `lock` before the command starts
-2. Sends periodic `beat` while the command runs
-3. Sends `unlock` on completion with exit code and duration
-4. If the process dies, the server detects the missing heartbeat and marks the run `stale` then `dead`
+If the command hangs or the process dies, the server detects the missing heartbeat and marks the run `stale` then `dead`.
 
-### `agent-pulse lock <service>`
+### `lock` / `beat` / `unlock` -- Manual Lifecycle
 
-Signal that work is starting.
+For workflows that aren't a single command -- scripts, multi-step pipelines, long-running processes.
 
 ```bash
-npx @eggy.sh/agentpulse lock my-service
-npx @eggy.sh/agentpulse lock my-service --tool gh --resource repos --message "Starting sync"
+# Start a database migration
+npx @eggy.sh/agentpulse lock db/migrate \
+  --tool psql --resource schemas \
+  --message "Migrating users table to v3"
+# → { "run_id": "run_k7xPm2", "status": "locked" }
+
+# Report progress as work continues
+npx @eggy.sh/agentpulse beat db/migrate \
+  --run-id run_k7xPm2 \
+  --message "Backfilling email_verified (2/3)"
+
+# Signal completion
+npx @eggy.sh/agentpulse unlock db/migrate \
+  --run-id run_k7xPm2 --exit-code 0
 ```
 
-### `agent-pulse beat <service>`
+If the script crashes at step 2, the last heartbeat message tells you exactly where it stopped.
 
-Send a heartbeat to indicate progress.
+### `status` -- What's Happening Now
 
 ```bash
-npx @eggy.sh/agentpulse beat my-service
-npx @eggy.sh/agentpulse beat my-service --run-id abc123 --message "Processing page 3/10"
+npx @eggy.sh/agentpulse status                      # all runs
+npx @eggy.sh/agentpulse status --service github      # filter by service
+npx @eggy.sh/agentpulse status --filter stale,dead   # only problems
+npx @eggy.sh/agentpulse status --json                # pipe to jq
 ```
 
-### `agent-pulse unlock <service>`
-
-Signal that work is complete.
+### `server start` / `init`
 
 ```bash
-npx @eggy.sh/agentpulse unlock my-service
-npx @eggy.sh/agentpulse unlock my-service --run-id abc123 --exit-code 0
+npx @eggy.sh/agentpulse init           # create ~/.agent-pulse/config.json
+npx @eggy.sh/agentpulse server start   # start the local server on :7778
 ```
 
-### `agent-pulse status`
-
-View current state of all tracked services and runs.
-
-```bash
-# Overview
-npx @eggy.sh/agentpulse status
-
-# Filter by service
-npx @eggy.sh/agentpulse status --service github
-
-# Show only stale/dead runs
-npx @eggy.sh/agentpulse status --filter stale,dead
-
-# JSON output for automation
-npx @eggy.sh/agentpulse status --json
-```
-
-### `agent-pulse server start`
-
-Start the local observability server.
-
-```bash
-npx @eggy.sh/agentpulse server start
-npx @eggy.sh/agentpulse server start --port 7778 --host 127.0.0.1
-```
-
-### `agent-pulse init`
-
-Initialize configuration and data directory.
-
-```bash
-npx @eggy.sh/agentpulse init
-```
-
-Creates `~/.agent-pulse/config.json` with default settings.
+See [docs/scenarios.md](./docs/scenarios.md) for full walkthroughs -- GitHub PR reviews, database migrations, multi-step deploys, Claude Code sessions, and Google Workspace syncs.
 
 ## SDK Usage
-
-Use the TypeScript/Node.js client in your own tools and agents:
 
 ```typescript
 import { PulseClient } from "@eggy.sh/agentpulse";
 
-const client = new PulseClient({
-  serverUrl: "http://127.0.0.1:7778",
-  sessionId: "my-agent-session",
+const pulse = new PulseClient({ serverUrl: "http://127.0.0.1:7778" });
+
+// Wrap async work — heartbeats are sent automatically
+await pulse.trackRun("github", async (runId) => {
+  await exec("gh pr merge 42 --repo acme/api --squash");
+}, { tool_name: "gh", resource_kind: "pulls" });
+
+// Or control the lifecycle yourself
+const { run_id } = await pulse.lock("db/migrate", {
+  tool_name: "psql",
+  resource_kind: "schemas",
+  message: "Migrating users table",
 });
+await runMigration();
+await pulse.unlock("db/migrate", { run_id, exit_code: 0 });
 
-// Manual lifecycle
-const { run_id } = await client.lock("github", {
-  tool_name: "gh",
-  resource_kind: "pulls",
-});
-// ... do work ...
-await client.unlock("github", { run_id, exit_code: 0 });
-
-// Or use the trackRun helper
-await client.trackRun("github", async (runId) => {
-  // Your work here -- heartbeats are sent automatically
-  await deployThing();
-}, { tool_name: "gh", resource_kind: "deployments" });
-
-// Check overall status
-const overview = await client.overview();
-console.log(overview.runs.stale); // number of stuck runs
+// Query what's happening
+const overview = await pulse.overview();
+console.log(overview.runs.stale); // stuck runs count
 ```
 
 ## Claude Code Hooks

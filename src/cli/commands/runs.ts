@@ -178,7 +178,7 @@ export function makeRunsCommand(): Command {
           log.error(
             `Failed to fetch runs: ${error instanceof Error ? error.message : String(error)}`,
           );
-          log.dim("Is the server running? Start it with: npx @eggy.sh/agentpulse server start");
+          log.dim("Is the server running? Start it with: npx agent-heart server start");
         }
         process.exit(1);
       }

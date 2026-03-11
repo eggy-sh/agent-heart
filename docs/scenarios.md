@@ -12,18 +12,18 @@ Your agent reviews pull requests. It lists open PRs, reads diffs, and posts comm
 
 ```bash
 # Start the server (once)
-npx @eggy.sh/agentpulse server start
+npx agent-heart server start
 
 # Wrap each gh call — lifecycle tracking is automatic
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service github --tool gh --resource pulls \
   -- gh pr list --repo acme/api --state open
 
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service github --tool gh --resource pulls \
   -- gh pr view 42 --repo acme/api
 
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service github --tool gh --resource reviews \
   -- gh pr review 42 --repo acme/api --approve
 ```
@@ -31,7 +31,7 @@ npx @eggy.sh/agentpulse exec \
 ### What status shows
 
 ```bash
-npx @eggy.sh/agentpulse status
+npx agent-heart status
 ```
 
 ```
@@ -60,7 +60,7 @@ Not everything is a single CLI command. A migration script runs for minutes. It 
 ### Lock — signal the start
 
 ```bash
-npx @eggy.sh/agentpulse lock db/migrate \
+npx agent-heart lock db/migrate \
   --tool psql \
   --resource schemas \
   --message "Migrating users table to v3"
@@ -79,15 +79,15 @@ Save that `run_id`. You'll need it.
 Your migration script sends heartbeats as it progresses:
 
 ```bash
-npx @eggy.sh/agentpulse beat db/migrate \
+npx agent-heart beat db/migrate \
   --run-id run_k7xPm2 \
   --message "Applied column additions (1/3)"
 
-npx @eggy.sh/agentpulse beat db/migrate \
+npx agent-heart beat db/migrate \
   --run-id run_k7xPm2 \
   --message "Backfilling email_verified (2/3)"
 
-npx @eggy.sh/agentpulse beat db/migrate \
+npx agent-heart beat db/migrate \
   --run-id run_k7xPm2 \
   --message "Dropping legacy columns (3/3)"
 ```
@@ -97,7 +97,7 @@ Each beat updates the timestamp and message. The server knows the run is alive.
 ### Unlock — signal completion
 
 ```bash
-npx @eggy.sh/agentpulse unlock db/migrate \
+npx agent-heart unlock db/migrate \
   --run-id run_k7xPm2 \
   --exit-code 0
 ```
@@ -105,7 +105,7 @@ npx @eggy.sh/agentpulse unlock db/migrate \
 If the script fails halfway:
 
 ```bash
-npx @eggy.sh/agentpulse unlock db/migrate \
+npx agent-heart unlock db/migrate \
   --run-id run_k7xPm2 \
   --exit-code 1 \
   --message "Foreign key constraint failed on orders.user_id"
@@ -119,7 +119,7 @@ If the script crashes and never sends `unlock`, the server detects it:
 2. After `max_silence_ms` (default 10 minutes) — run transitions to `dead`
 
 ```bash
-npx @eggy.sh/agentpulse status --filter stale,dead
+npx agent-heart status --filter stale,dead
 ```
 
 ```
@@ -136,22 +136,22 @@ The last heartbeat message tells you exactly where it stopped. Step 2 of 3. The 
 An agent runs a deploy: lint, build, push image, apply to the cluster. Four steps. Each wrapped separately so you can see exactly where a failure occurred.
 
 ```bash
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service deploy --tool npm --resource lint \
   --session deploy-v2.3.1 \
   -- npm run lint
 
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service deploy --tool docker --resource images \
   --session deploy-v2.3.1 \
   -- docker build -t acme/api:v2.3.1 .
 
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service deploy --tool docker --resource registry \
   --session deploy-v2.3.1 \
   -- docker push acme/api:v2.3.1
 
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service deploy --tool kubectl --resource deployments \
   --session deploy-v2.3.1 \
   -- kubectl set image deployment/api api=acme/api:v2.3.1 -n production
@@ -160,7 +160,7 @@ npx @eggy.sh/agentpulse exec \
 All four share the same `--session` so you can query them together:
 
 ```bash
-npx @eggy.sh/agentpulse runs --session deploy-v2.3.1
+npx agent-heart runs --session deploy-v2.3.1
 ```
 
 ```
@@ -190,14 +190,14 @@ Add to `.claude/settings.json`:
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "echo '$TOOL_INPUT' | npx @eggy.sh/agentpulse hook claude-code --event pre-tool-use"
+        "command": "echo '$TOOL_INPUT' | npx agent-heart hook claude-code --event pre-tool-use"
       }]
     }],
     "PostToolUse": [{
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "echo '$TOOL_INPUT' | npx @eggy.sh/agentpulse hook claude-code --event post-tool-use"
+        "command": "echo '$TOOL_INPUT' | npx agent-heart hook claude-code --event post-tool-use"
       }]
     }]
   }
@@ -221,7 +221,7 @@ claude-code/Bash      → lock → beat → unlock (completed, 6.2s)
 Seven tool calls. Test failed on the fourth Bash (the first test run). Claude fixed the code and re-ran. All visible in one query:
 
 ```bash
-npx @eggy.sh/agentpulse runs --service claude-code --json | jq '.[] | {tool: .tool_name, status, duration_ms}'
+npx agent-heart runs --service claude-code --json | jq '.[] | {tool: .tool_name, status, duration_ms}'
 ```
 
 ### Add a background watcher
@@ -229,7 +229,7 @@ npx @eggy.sh/agentpulse runs --service claude-code --json | jq '.[] | {tool: .to
 While Claude works, set up a loop to catch problems:
 
 ```
-/loop 3m check npx @eggy.sh/agentpulse runs --status stale --json and tell me if anything is stuck
+/loop 3m check npx agent-heart runs --status stale --json and tell me if anything is stuck
 ```
 
 If a Bash command hangs — waiting for input, hitting a rate limit, stuck on a network call — the loop catches it within three minutes. No silent failures.
@@ -241,21 +241,21 @@ If a Bash command hangs — waiting for input, hitting a rate limit, stuck on a 
 An agent manages documents in Google Drive. It lists files, downloads reports, uploads summaries. Each operation is a tracked run.
 
 ```bash
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service gws --tool gws --resource files \
   -- gws drive files list --folder "Quarterly Reports"
 
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service gws --tool gws --resource files \
   -- gws drive files export --file-id 1a2b3c --mime "text/csv" --out q4-revenue.csv
 
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service gws --tool gws --resource files \
   -- gws drive files upload --parent "Summaries" --file ./q4-summary.md
 ```
 
 ```bash
-npx @eggy.sh/agentpulse status --service gws
+npx agent-heart status --service gws
 ```
 
 ```

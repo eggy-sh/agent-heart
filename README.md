@@ -42,10 +42,10 @@ That is the gap `agent-pulse` is built to fill.
 
 **Silent failure detection** -- if a run stops sending heartbeats entirely, it is marked `dead`. No more silent disappearances.
 
-**Universal CLI wrapper** -- wrap any command with `npx @eggy.sh/agentpulse exec` and get automatic lifecycle tracking, duration capture, and exit code recording. No code changes required.
+**Universal CLI wrapper** -- wrap any command with `npx agent-heart exec` and get automatic lifecycle tracking, duration capture, and exit code recording. No code changes required.
 
 ```
-npx @eggy.sh/agentpulse exec --service github --tool gh --resource pulls \
+npx agent-heart exec --service github --tool gh --resource pulls \
   -- gh pr list --repo acme/api
 ```
 
@@ -53,17 +53,17 @@ npx @eggy.sh/agentpulse exec --service github --tool gh --resource pulls \
 
 ```bash
 # Initialize configuration
-npx @eggy.sh/agentpulse init
+npx agent-heart init
 
 # Start the local server
-npx @eggy.sh/agentpulse server start
+npx agent-heart server start
 
 # Wrap any CLI command with automatic tracking
-npx @eggy.sh/agentpulse exec --service github --tool gh --resource pulls \
+npx agent-heart exec --service github --tool gh --resource pulls \
   -- gh pr list --repo acme/api
 
 # Check status
-npx @eggy.sh/agentpulse status
+npx agent-heart status
 ```
 
 ## CLI Reference
@@ -73,7 +73,7 @@ npx @eggy.sh/agentpulse status
 The fastest path to tracking. Wraps a CLI command with automatic `lock`, periodic `beat`, and `unlock` on exit.
 
 ```bash
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service github --tool gh --resource pulls \
   -- gh pr list --repo acme/api --state open
 ```
@@ -81,7 +81,7 @@ npx @eggy.sh/agentpulse exec \
 Group related commands into a session:
 
 ```bash
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service deploy --tool kubectl --resource deployments \
   --session deploy-v2.3.1 \
   -- kubectl set image deployment/api api=acme/api:v2.3.1 -n production
@@ -95,18 +95,18 @@ For workflows that aren't a single command -- scripts, multi-step pipelines, lon
 
 ```bash
 # Start a database migration
-npx @eggy.sh/agentpulse lock db/migrate \
+npx agent-heart lock db/migrate \
   --tool psql --resource schemas \
   --message "Migrating users table to v3"
 # → { "run_id": "run_k7xPm2", "status": "locked" }
 
 # Report progress as work continues
-npx @eggy.sh/agentpulse beat db/migrate \
+npx agent-heart beat db/migrate \
   --run-id run_k7xPm2 \
   --message "Backfilling email_verified (2/3)"
 
 # Signal completion
-npx @eggy.sh/agentpulse unlock db/migrate \
+npx agent-heart unlock db/migrate \
   --run-id run_k7xPm2 --exit-code 0
 ```
 
@@ -115,17 +115,17 @@ If the script crashes at step 2, the last heartbeat message tells you exactly wh
 ### `status` -- What's Happening Now
 
 ```bash
-npx @eggy.sh/agentpulse status                      # all runs
-npx @eggy.sh/agentpulse status --service github      # filter by service
-npx @eggy.sh/agentpulse status --filter stale,dead   # only problems
-npx @eggy.sh/agentpulse status --json                # pipe to jq
+npx agent-heart status                      # all runs
+npx agent-heart status --service github      # filter by service
+npx agent-heart status --filter stale,dead   # only problems
+npx agent-heart status --json                # pipe to jq
 ```
 
 ### `server start` / `init`
 
 ```bash
-npx @eggy.sh/agentpulse init           # create ~/.agent-pulse/config.json
-npx @eggy.sh/agentpulse server start   # start the local server on :7778
+npx agent-heart init           # create ~/.agent-pulse/config.json
+npx agent-heart server start   # start the local server on :7778
 ```
 
 See [docs/scenarios.md](./docs/scenarios.md) for full walkthroughs -- GitHub PR reviews, database migrations, multi-step deploys, Claude Code sessions, and Google Workspace syncs.
@@ -133,7 +133,7 @@ See [docs/scenarios.md](./docs/scenarios.md) for full walkthroughs -- GitHub PR 
 ## SDK Usage
 
 ```typescript
-import { PulseClient } from "@eggy.sh/agentpulse";
+import { PulseClient } from "agent-heart";
 
 const pulse = new PulseClient({ serverUrl: "http://127.0.0.1:7778" });
 
@@ -168,25 +168,25 @@ Add to your `.claude/settings.json`:
     "SessionStart": [
       {
         "matcher": "",
-        "hooks": [{ "type": "command", "command": "npx @eggy.sh/agentpulse lock claude-code/session --tool session --message 'Session started'" }]
+        "hooks": [{ "type": "command", "command": "npx agent-heart lock claude-code/session --tool session --message 'Session started'" }]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "",
-        "hooks": [{ "type": "command", "command": "echo '$TOOL_INPUT' | npx @eggy.sh/agentpulse hook claude-code --event pre-tool-use" }]
+        "hooks": [{ "type": "command", "command": "echo '$TOOL_INPUT' | npx agent-heart hook claude-code --event pre-tool-use" }]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "",
-        "hooks": [{ "type": "command", "command": "echo '$TOOL_INPUT' | npx @eggy.sh/agentpulse hook claude-code --event post-tool-use" }]
+        "hooks": [{ "type": "command", "command": "echo '$TOOL_INPUT' | npx agent-heart hook claude-code --event post-tool-use" }]
       }
     ],
     "SessionEnd": [
       {
         "matcher": "",
-        "hooks": [{ "type": "command", "command": "npx @eggy.sh/agentpulse unlock claude-code/session --tool session --message 'Session ended'" }]
+        "hooks": [{ "type": "command", "command": "npx agent-heart unlock claude-code/session --tool session --message 'Session ended'" }]
       }
     ]
   }
@@ -201,13 +201,13 @@ Claude Code's [`/loop`](https://code.claude.com/docs/en/scheduled-tasks) runs a 
 
 ```
 # Watch for stuck runs every 3 minutes
-/loop 3m check npx @eggy.sh/agentpulse runs --status stale --json and tell me if anything is stuck
+/loop 3m check npx agent-heart runs --status stale --json and tell me if anything is stuck
 
 # Watch a specific deploy
-/loop 1m check npx @eggy.sh/agentpulse runs --service agent/deploy and tell me when it finishes
+/loop 1m check npx agent-heart runs --service agent/deploy and tell me when it finishes
 
 # Full session health check
-/loop 10m run npx @eggy.sh/agentpulse overview --json and summarize active, stale, and dead runs
+/loop 10m run npx agent-heart overview --json and summarize active, stale, and dead runs
 ```
 
 Hooks record what the agent does. `/loop` watches whether it's going well. See [docs/why-agent-observability.md](./docs/why-agent-observability.md) for why this pattern matters and where the market is headed.

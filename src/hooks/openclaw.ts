@@ -9,10 +9,10 @@
  * types (browser, memory, etc.) are handled gracefully.
  *
  * Usage from an OpenClaw plugin hook:
- *   npx @eggy.sh/agentpulse hook openclaw < event.json
+ *   npx agent-heart hook openclaw < event.json
  *
  * Or programmatically:
- *   import { handleOpenClawEvent } from "@eggy.sh/agentpulse/hooks/openclaw";
+ *   import { handleOpenClawEvent } from "agent-heart/hooks/openclaw";
  *   await handleOpenClawEvent(data);
  */
 
@@ -506,7 +506,7 @@ async function readStdin(): Promise<string> {
  * Reads JSON from stdin and dispatches to the appropriate handler.
  *
  * Usage:
- *   echo '{"event":"before_tool_call",...}' | npx @eggy.sh/agentpulse hook openclaw
+ *   echo '{"event":"before_tool_call",...}' | npx agent-heart hook openclaw
  */
 export async function readStdinAndHandle(): Promise<void> {
   const raw = await readStdin();

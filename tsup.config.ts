@@ -11,6 +11,7 @@ export default defineConfig([
     clean: true,
     target: "node20",
     splitting: false,
+    external: ["sql.js"],
     banner: {
       js: "#!/usr/bin/env node",
     },

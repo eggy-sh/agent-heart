@@ -4,8 +4,8 @@
   "plugins": {
     "agent-pulse": {
       "hooks": {
-        "before_tool_call": "npx @eggy.sh/agentpulse hook openclaw",
-        "after_tool_call": "npx @eggy.sh/agentpulse hook openclaw"
+        "before_tool_call": "npx agent-heart hook openclaw",
+        "after_tool_call": "npx agent-heart hook openclaw"
       }
     }
   }

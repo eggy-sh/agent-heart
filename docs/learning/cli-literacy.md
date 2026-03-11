@@ -2,7 +2,7 @@
 
 You don't need to become an engineer. You need to read a sentence.
 
-That's what a CLI command is. A sentence. Subject, verb, object, modifiers. Once you see the grammar, every command you encounter -- from `gh pr list` to `kubectl get pods` to `npx @eggy.sh/agentpulse status` -- becomes readable. Not because you memorized it. Because you understand the structure.
+That's what a CLI command is. A sentence. Subject, verb, object, modifiers. Once you see the grammar, every command you encounter -- from `gh pr list` to `kubectl get pods` to `npx agent-heart status` -- becomes readable. Not because you memorized it. Because you understand the structure.
 
 This guide gets you there.
 
@@ -59,12 +59,12 @@ That's not pseudocode. That's a real command you can run right now if you have `
 ### Another One
 
 ```bash
-npx @eggy.sh/agentpulse exec --service github --tool gh --resource pulls -- gh pr list
+npx agent-heart exec --service github --tool gh --resource pulls -- gh pr list
 ```
 
-> "Run agentpulse's exec wrapper, tracking this as a github service call using the gh tool against the pulls resource, and the actual command to run is gh pr list."
+> "Run agent-heart's exec wrapper, tracking this as a github service call using the gh tool against the pulls resource, and the actual command to run is gh pr list."
 
-The `--` (double dash by itself) is a separator. Everything before it is flags for agentpulse. Everything after it is the command being wrapped.
+The `--` (double dash by itself) is a separator. Everything before it is flags for agent-heart. Everything after it is the command being wrapped.
 
 Once you see the grammar, you can read any command. You don't need to have used the tool before.
 
@@ -139,7 +139,7 @@ This is composability. And it's the reason CLIs outlasted every GUI trend for fi
 
 ```bash
 # Count how many stale runs you have
-npx @eggy.sh/agentpulse status --json | jq '[.[] | select(.status == "stale")] | length'
+npx agent-heart status --json | jq '[.[] | select(.status == "stale")] | length'
 ```
 
 That's agent-pulse's status piped into `jq` to count stale runs. One line. No dashboard needed.
@@ -190,7 +190,7 @@ Here's a real config from a Claude Code hooks file:
 ```json
 {
   "type": "command",
-  "command": "echo '$TOOL_INPUT' | npx @eggy.sh/agentpulse hook claude-code --event pre-tool-use"
+  "command": "echo '$TOOL_INPUT' | npx agent-heart hook claude-code --event pre-tool-use"
 }
 ```
 
@@ -198,11 +198,11 @@ Break it down:
 
 1. `echo '$TOOL_INPUT'` -- print the contents of the `TOOL_INPUT` variable
 2. `|` -- pipe that output into the next command
-3. `npx @eggy.sh/agentpulse` -- run the agentpulse CLI via npx
+3. `npx agent-heart` -- run the agent-heart CLI via npx
 4. `hook claude-code` -- use the hook subcommand for Claude Code
 5. `--event pre-tool-use` -- specify this is a pre-tool-use event
 
-That's a hook that fires before every tool call, sends the tool's input to agentpulse, and agentpulse records it. You can read that now. You couldn't ten minutes ago.
+That's a hook that fires before every tool call, sends the tool's input to agent-heart, and agent-heart records it. You can read that now. You couldn't ten minutes ago.
 
 ### Practice: Read These
 
@@ -221,7 +221,7 @@ docker build -t acme/api:v2.3.1 .
 > "Docker, build an image, tag it as acme/api version 2.3.1, using the current directory as the build context."
 
 ```bash
-npx @eggy.sh/agentpulse runs --service github --status failed --json | jq '.[].message'
+npx agent-heart runs --service github --status failed --json | jq '.[].message'
 ```
 
 > "Show me agent-pulse runs for the github service that failed, in JSON format, then extract just the message field from each one."
@@ -258,10 +258,10 @@ gh pr list --repo acme/api --state open --json title,url
 
 ```bash
 # Original: verbose output
-npx @eggy.sh/agentpulse status --verbose
+npx agent-heart status --verbose
 
 # Modified: just the basics
-npx @eggy.sh/agentpulse status
+npx agent-heart status
 ```
 
 Find a working command. Change one thing. Run it. See what happens. That's the loop.

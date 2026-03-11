@@ -33,7 +33,7 @@ export async function startServer(
   }
 
   // Initialize database
-  const db = createDatabase(config.database.path);
+  const db = await createDatabase(config.database.path);
   log.info(`Database initialized at ${config.database.path}`);
 
   // Seed configured services

@@ -11,10 +11,10 @@ import type { GwsCommandInfo, GwsResultInfo } from "../../adapters/gws.js";
  * Dedicated GWS (Google Workspace CLI) wrapper command.
  *
  * Usage:
- *   npx @eggy.sh/agentpulse gws drive files list --params '{"pageSize": 10}'
+ *   npx agent-heart gws drive files list --params '{"pageSize": 10}'
  *
  * This is equivalent to:
- *   npx @eggy.sh/agentpulse exec --service gws-drive --tool gws --resource files -- gws drive files list --params '{"pageSize": 10}'
+ *   npx agent-heart exec --service gws-drive --tool gws --resource files -- gws drive files list --params '{"pageSize": 10}'
  *
  * But with automatic metadata extraction and GWS-aware output parsing.
  */
@@ -51,16 +51,16 @@ export function makeGwsCommand(): Command {
 
       // Handle help explicitly since we disabled Commander's helpOption
       if (gwsArgs.length === 0 || gwsArgs[0] === "--help" || gwsArgs[0] === "-h") {
-        console.log(`Usage: npx @eggy.sh/agentpulse gws <service> <resource> <method> [gws flags]
+        console.log(`Usage: npx agent-heart gws <service> <resource> <method> [gws flags]
 
 Wrap a gws (Google Workspace CLI) command with automatic observability.
 Auto-extracts service, resource, and method metadata from the gws command structure.
 
 Examples:
-  npx @eggy.sh/agentpulse gws drive files list --params '{"pageSize": 10}'
-  npx @eggy.sh/agentpulse gws sheets spreadsheets create --body '{"properties":{"title":"Report"}}'
-  npx @eggy.sh/agentpulse gws gmail users messages list --params '{"userId":"me"}'
-  npx @eggy.sh/agentpulse gws calendar events list --params '{"calendarId":"primary"}'
+  npx agent-heart gws drive files list --params '{"pageSize": 10}'
+  npx agent-heart gws sheets spreadsheets create --body '{"properties":{"title":"Report"}}'
+  npx agent-heart gws gmail users messages list --params '{"userId":"me"}'
+  npx agent-heart gws calendar events list --params '{"calendarId":"primary"}'
 
 Options:
   -s, --session <id>              Session ID
@@ -73,8 +73,8 @@ Options:
 
       if (gwsArgs.length === 0) {
         log.error("No gws command specified.");
-        log.dim("Usage: npx @eggy.sh/agentpulse gws <service> <resource> <method> [gws flags]");
-        log.dim("Example: npx @eggy.sh/agentpulse gws drive files list --params '{\"pageSize\": 10}'");
+        log.dim("Usage: npx agent-heart gws <service> <resource> <method> [gws flags]");
+        log.dim("Example: npx agent-heart gws drive files list --params '{\"pageSize\": 10}'");
         process.exit(1);
       }
 

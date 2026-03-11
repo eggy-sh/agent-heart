@@ -123,7 +123,7 @@ Save it as `deploy.sh`, run `chmod +x deploy.sh`, and now `./deploy.sh` runs all
 Wrap it with agent-pulse and you get lifecycle tracking for free:
 
 ```bash
-npx @eggy.sh/agentpulse exec --service deploy --tool bash --resource production -- ./deploy.sh
+npx agent-heart exec --service deploy --tool bash --resource production -- ./deploy.sh
 ```
 
 ### Level 2: Parameterized Scripts

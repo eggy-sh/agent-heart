@@ -1,4 +1,5 @@
-import Database from "better-sqlite3";
+import initSqlJs, { type Database as SqlJsDatabase, type BindParams } from "sql.js";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { nanoid } from "nanoid";
 import type {
   Run,
@@ -95,12 +96,44 @@ function rowToServiceConfig(row: ServiceRow): ServiceConfig {
   };
 }
 
-export function createDatabase(dbPath: string): PulseDB {
-  const db = new Database(dbPath);
+/** Run a SELECT and return all matching rows as objects */
+function queryAll<T>(db: SqlJsDatabase, sql: string, params?: BindParams): T[] {
+  const stmt = db.prepare(sql);
+  if (params) stmt.bind(params);
+  const rows: T[] = [];
+  while (stmt.step()) {
+    rows.push(stmt.getAsObject() as T);
+  }
+  stmt.free();
+  return rows;
+}
 
-  // Enable WAL mode for better concurrent read performance
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
+/** Run a SELECT and return the first matching row as an object */
+function queryOne<T>(db: SqlJsDatabase, sql: string, params?: BindParams): T | undefined {
+  const stmt = db.prepare(sql);
+  if (params) stmt.bind(params);
+  let result: T | undefined;
+  if (stmt.step()) {
+    result = stmt.getAsObject() as T;
+  }
+  stmt.free();
+  return result;
+}
+
+export async function createDatabase(dbPath: string): Promise<PulseDB> {
+  const SQL = await initSqlJs();
+
+  // Load existing database or create new
+  let db: SqlJsDatabase;
+  if (existsSync(dbPath)) {
+    const fileBuffer = readFileSync(dbPath);
+    db = new SQL.Database(fileBuffer);
+  } else {
+    db = new SQL.Database();
+  }
+
+  // Enable foreign keys
+  db.run("PRAGMA foreign_keys = ON");
 
   // Create tables
   db.exec(`
@@ -151,37 +184,13 @@ export function createDatabase(dbPath: string): PulseDB {
     );
   `);
 
-  // Prepared statements
-  const insertRun = db.prepare(`
-    INSERT INTO runs (run_id, session_id, service_name, tool_name, command, command_family,
-      resource_kind, resource_id, status, severity, message, exit_code, duration_ms,
-      started_at, last_heartbeat, completed_at, metadata)
-    VALUES (@run_id, @session_id, @service_name, @tool_name, @command, @command_family,
-      @resource_kind, @resource_id, @status, @severity, @message, @exit_code, @duration_ms,
-      @started_at, @last_heartbeat, @completed_at, @metadata)
-  `);
+  function save(): void {
+    const data = db.export();
+    writeFileSync(dbPath, Buffer.from(data));
+  }
 
-  const selectRun = db.prepare(`SELECT * FROM runs WHERE run_id = ?`);
-
-  const selectActiveRuns = db.prepare(
-    `SELECT * FROM runs WHERE status IN ('locked', 'active') ORDER BY last_heartbeat DESC`,
-  );
-
-  const selectLatestActiveRun = db.prepare(
-    `SELECT * FROM runs WHERE service_name = ? AND status IN ('locked', 'active')
-     ORDER BY last_heartbeat DESC LIMIT 1`,
-  );
-
-  const upsertServiceStmt = db.prepare(`
-    INSERT INTO services (name, expected_cycle_ms, max_silence_ms, endpoints)
-    VALUES (@name, @expected_cycle_ms, @max_silence_ms, @endpoints)
-    ON CONFLICT(name) DO UPDATE SET
-      expected_cycle_ms = @expected_cycle_ms,
-      max_silence_ms = @max_silence_ms,
-      endpoints = @endpoints
-  `);
-
-  const selectService = db.prepare(`SELECT * FROM services WHERE name = ?`);
+  // Persist initial schema
+  save();
 
   const pulseDb: PulseDB = {
     createRun(req: HeartbeatRequest): Run {
@@ -206,48 +215,79 @@ export function createDatabase(dbPath: string): PulseDB {
         metadata: req.metadata ?? {},
       };
 
-      insertRun.run({
-        ...run,
-        metadata: JSON.stringify(run.metadata),
-      });
+      db.run(
+        `INSERT INTO runs (run_id, session_id, service_name, tool_name, command, command_family,
+          resource_kind, resource_id, status, severity, message, exit_code, duration_ms,
+          started_at, last_heartbeat, completed_at, metadata)
+        VALUES ($run_id, $session_id, $service_name, $tool_name, $command, $command_family,
+          $resource_kind, $resource_id, $status, $severity, $message, $exit_code, $duration_ms,
+          $started_at, $last_heartbeat, $completed_at, $metadata)`,
+        {
+          $run_id: run.run_id,
+          $session_id: run.session_id,
+          $service_name: run.service_name,
+          $tool_name: run.tool_name,
+          $command: run.command,
+          $command_family: run.command_family,
+          $resource_kind: run.resource_kind,
+          $resource_id: run.resource_id,
+          $status: run.status,
+          $severity: run.severity,
+          $message: run.message,
+          $exit_code: run.exit_code,
+          $duration_ms: run.duration_ms,
+          $started_at: run.started_at,
+          $last_heartbeat: run.last_heartbeat,
+          $completed_at: run.completed_at,
+          $metadata: JSON.stringify(run.metadata),
+        } as BindParams,
+      );
 
+      save();
       return run;
     },
 
     updateRun(runId: string, updates: Partial<Run>): Run {
-      const existing = selectRun.get(runId) as RunRow | undefined;
+      const existing = queryOne<RunRow>(db,
+        `SELECT * FROM runs WHERE run_id = $run_id`,
+        { $run_id: runId } as BindParams,
+      );
       if (!existing) {
         throw new Error(`Run not found: ${runId}`);
       }
 
-      const currentRun = rowToRun(existing);
-
-      // Build SET clause dynamically from the updates provided
       const fields: string[] = [];
-      const values: Record<string, unknown> = { run_id: runId };
+      const values: Record<string, unknown> = { $run_id: runId };
 
       for (const [key, value] of Object.entries(updates)) {
-        if (key === "run_id") continue; // Never update the primary key
+        if (key === "run_id") continue;
         if (key === "metadata") {
-          fields.push(`${key} = @${key}`);
-          values[key] = JSON.stringify(value);
+          fields.push(`${key} = $${key}`);
+          values[`$${key}`] = JSON.stringify(value);
         } else {
-          fields.push(`${key} = @${key}`);
-          values[key] = value;
+          fields.push(`${key} = $${key}`);
+          values[`$${key}`] = value;
         }
       }
 
       if (fields.length > 0) {
-        const sql = `UPDATE runs SET ${fields.join(", ")} WHERE run_id = @run_id`;
-        db.prepare(sql).run(values);
+        const sql = `UPDATE runs SET ${fields.join(", ")} WHERE run_id = $run_id`;
+        db.run(sql, values as BindParams);
+        save();
       }
 
-      const updated = selectRun.get(runId) as RunRow;
-      return rowToRun(updated);
+      const updated = queryOne<RunRow>(db,
+        `SELECT * FROM runs WHERE run_id = $run_id`,
+        { $run_id: runId } as BindParams,
+      );
+      return rowToRun(updated!);
     },
 
     getRun(runId: string): Run | null {
-      const row = selectRun.get(runId) as RunRow | undefined;
+      const row = queryOne<RunRow>(db,
+        `SELECT * FROM runs WHERE run_id = $run_id`,
+        { $run_id: runId } as BindParams,
+      );
       return row ? rowToRun(row) : null;
     },
 
@@ -261,70 +301,67 @@ export function createDatabase(dbPath: string): PulseDB {
       const params: Record<string, unknown> = {};
 
       if (filters?.service) {
-        conditions.push("service_name = @service");
-        params.service = filters.service;
+        conditions.push("service_name = $service");
+        params.$service = filters.service;
       }
       if (filters?.status) {
-        conditions.push("status = @status");
-        params.status = filters.status;
+        conditions.push("status = $status");
+        params.$status = filters.status;
       }
       if (filters?.session_id) {
-        conditions.push("session_id = @session_id");
-        params.session_id = filters.session_id;
+        conditions.push("session_id = $session_id");
+        params.$session_id = filters.session_id;
       }
 
       const where =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
       const limit = filters?.limit ?? 100;
 
-      const sql = `SELECT * FROM runs ${where} ORDER BY last_heartbeat DESC LIMIT @limit`;
-      params.limit = limit;
+      const sql = `SELECT * FROM runs ${where} ORDER BY last_heartbeat DESC LIMIT $limit`;
+      params.$limit = limit;
 
-      const rows = db.prepare(sql).all(params) as RunRow[];
+      const rows = queryAll<RunRow>(db, sql, params as BindParams);
       return rows.map(rowToRun);
     },
 
     getActiveRuns(): Run[] {
-      const rows = selectActiveRuns.all() as RunRow[];
+      const rows = queryAll<RunRow>(db,
+        `SELECT * FROM runs WHERE status IN ('locked', 'active') ORDER BY last_heartbeat DESC`,
+      );
       return rows.map(rowToRun);
     },
 
     getServiceStates(): ServiceState[] {
-      // Get all known service names from both runs and services tables
-      const serviceNames = db
-        .prepare(
-          `SELECT DISTINCT name AS service_name FROM services
-           UNION
-           SELECT DISTINCT service_name FROM runs`,
-        )
-        .all() as Array<{ service_name: string }>;
+      const serviceNames = queryAll<{ service_name: string }>(db,
+        `SELECT DISTINCT name AS service_name FROM services
+         UNION
+         SELECT DISTINCT service_name FROM runs`,
+      );
 
       return serviceNames.map(({ service_name }) => {
-        const serviceConfig = selectService.get(service_name) as
-          | ServiceRow
-          | undefined;
+        const serviceConfig = queryOne<ServiceRow>(db,
+          `SELECT * FROM services WHERE name = $name`,
+          { $name: service_name } as BindParams,
+        );
 
         const expected_cycle_ms = serviceConfig?.expected_cycle_ms ?? 300_000;
         const max_silence_ms = serviceConfig?.max_silence_ms ?? 600_000;
 
-        const counts = db
-          .prepare(
-            `SELECT
-              COALESCE(SUM(CASE WHEN status IN ('locked', 'active') THEN 1 ELSE 0 END), 0) as active,
-              COALESCE(SUM(CASE WHEN status = 'stale' THEN 1 ELSE 0 END), 0) as stale,
-              COALESCE(SUM(CASE WHEN status = 'dead' THEN 1 ELSE 0 END), 0) as dead
-            FROM runs WHERE service_name = ?`,
-          )
-          .get(service_name) as { active: number; stale: number; dead: number };
+        const counts = queryOne<{ active: number; stale: number; dead: number }>(db,
+          `SELECT
+            COALESCE(SUM(CASE WHEN status IN ('locked', 'active') THEN 1 ELSE 0 END), 0) as active,
+            COALESCE(SUM(CASE WHEN status = 'stale' THEN 1 ELSE 0 END), 0) as stale,
+            COALESCE(SUM(CASE WHEN status = 'dead' THEN 1 ELSE 0 END), 0) as dead
+          FROM runs WHERE service_name = $service_name`,
+          { $service_name: service_name } as BindParams,
+        ) ?? { active: 0, stale: 0, dead: 0 };
 
-        const lastBeat = db
-          .prepare(
-            `SELECT last_heartbeat FROM runs WHERE service_name = ?
-             ORDER BY last_heartbeat DESC LIMIT 1`,
-          )
-          .get(service_name) as { last_heartbeat: string } | undefined;
+        const lastBeat = queryOne<{ last_heartbeat: string }>(db,
+          `SELECT last_heartbeat FROM runs WHERE service_name = $service_name
+           ORDER BY last_heartbeat DESC LIMIT 1`,
+          { $service_name: service_name } as BindParams,
+        );
 
-        // Determine overall service status and severity
         let status: RunStatus = "completed";
         let severity: Severity = "ok";
 
@@ -360,89 +397,99 @@ export function createDatabase(dbPath: string): PulseDB {
       completed: number;
       failed: number;
     } {
-      const row = db
-        .prepare(
-          `SELECT
-            COALESCE(SUM(CASE WHEN status IN ('locked', 'active') THEN 1 ELSE 0 END), 0) as active,
-            COALESCE(SUM(CASE WHEN status = 'stale' THEN 1 ELSE 0 END), 0) as stale,
-            COALESCE(SUM(CASE WHEN status = 'dead' THEN 1 ELSE 0 END), 0) as dead,
-            COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) as completed,
-            COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0) as failed
-          FROM runs`,
-        )
-        .get() as {
+      const row = queryOne<{
         active: number;
         stale: number;
         dead: number;
         completed: number;
         failed: number;
-      };
+      }>(db,
+        `SELECT
+          COALESCE(SUM(CASE WHEN status IN ('locked', 'active') THEN 1 ELSE 0 END), 0) as active,
+          COALESCE(SUM(CASE WHEN status = 'stale' THEN 1 ELSE 0 END), 0) as stale,
+          COALESCE(SUM(CASE WHEN status = 'dead' THEN 1 ELSE 0 END), 0) as dead,
+          COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) as completed,
+          COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0) as failed
+        FROM runs`,
+      );
 
-      return row;
+      return row ?? { active: 0, stale: 0, dead: 0, completed: 0, failed: 0 };
     },
 
     markStale(runId: string): void {
-      db.prepare(
-        `UPDATE runs SET status = 'stale', severity = 'warning' WHERE run_id = ?`,
-      ).run(runId);
+      db.run(
+        `UPDATE runs SET status = 'stale', severity = 'warning' WHERE run_id = $run_id`,
+        { $run_id: runId } as BindParams,
+      );
+      save();
     },
 
     markDead(runId: string): void {
-      db.prepare(
-        `UPDATE runs SET status = 'dead', severity = 'critical' WHERE run_id = ?`,
-      ).run(runId);
+      db.run(
+        `UPDATE runs SET status = 'dead', severity = 'critical' WHERE run_id = $run_id`,
+        { $run_id: runId } as BindParams,
+      );
+      save();
     },
 
     getStaleRuns(defaultCycleMs: number): Run[] {
-      // Find locked/active runs whose last heartbeat exceeds expected cycle time
-      // Use per-service config if available, otherwise fall back to default
-      const rows = db
-        .prepare(
-          `SELECT r.* FROM runs r
-           LEFT JOIN services s ON r.service_name = s.name
-           WHERE r.status IN ('locked', 'active')
-             AND (
-               (julianday('now') - julianday(r.last_heartbeat)) * 86400000
-               > COALESCE(s.expected_cycle_ms, @defaultCycleMs)
-             )`,
-        )
-        .all({ defaultCycleMs }) as RunRow[];
+      const rows = queryAll<RunRow>(db,
+        `SELECT r.* FROM runs r
+         LEFT JOIN services s ON r.service_name = s.name
+         WHERE r.status IN ('locked', 'active')
+           AND (
+             (julianday('now') - julianday(r.last_heartbeat)) * 86400000
+             > COALESCE(s.expected_cycle_ms, $defaultCycleMs)
+           )`,
+        { $defaultCycleMs: defaultCycleMs } as BindParams,
+      );
 
       return rows.map(rowToRun);
     },
 
     getDeadRuns(defaultSilenceMs: number): Run[] {
-      // Find locked/active/stale runs whose last heartbeat exceeds max silence time
-      const rows = db
-        .prepare(
-          `SELECT r.* FROM runs r
-           LEFT JOIN services s ON r.service_name = s.name
-           WHERE r.status IN ('locked', 'active', 'stale')
-             AND (
-               (julianday('now') - julianday(r.last_heartbeat)) * 86400000
-               > COALESCE(s.max_silence_ms, @defaultSilenceMs)
-             )`,
-        )
-        .all({ defaultSilenceMs }) as RunRow[];
+      const rows = queryAll<RunRow>(db,
+        `SELECT r.* FROM runs r
+         LEFT JOIN services s ON r.service_name = s.name
+         WHERE r.status IN ('locked', 'active', 'stale')
+           AND (
+             (julianday('now') - julianday(r.last_heartbeat)) * 86400000
+             > COALESCE(s.max_silence_ms, $defaultSilenceMs)
+           )`,
+        { $defaultSilenceMs: defaultSilenceMs } as BindParams,
+      );
 
       return rows.map(rowToRun);
     },
 
     upsertService(config: ServiceConfig): void {
-      upsertServiceStmt.run({
-        name: config.name,
-        expected_cycle_ms: config.expected_cycle_ms,
-        max_silence_ms: config.max_silence_ms,
-        endpoints: JSON.stringify(config.endpoints ?? []),
-      });
+      db.run(
+        `INSERT INTO services (name, expected_cycle_ms, max_silence_ms, endpoints)
+        VALUES ($name, $expected_cycle_ms, $max_silence_ms, $endpoints)
+        ON CONFLICT(name) DO UPDATE SET
+          expected_cycle_ms = $expected_cycle_ms,
+          max_silence_ms = $max_silence_ms,
+          endpoints = $endpoints`,
+        {
+          $name: config.name,
+          $expected_cycle_ms: config.expected_cycle_ms,
+          $max_silence_ms: config.max_silence_ms,
+          $endpoints: JSON.stringify(config.endpoints ?? []),
+        } as BindParams,
+      );
+      save();
     },
 
     getService(name: string): ServiceConfig | null {
-      const row = selectService.get(name) as ServiceRow | undefined;
+      const row = queryOne<ServiceRow>(db,
+        `SELECT * FROM services WHERE name = $name`,
+        { $name: name } as BindParams,
+      );
       return row ? rowToServiceConfig(row) : null;
     },
 
     close(): void {
+      save();
       db.close();
     },
   };

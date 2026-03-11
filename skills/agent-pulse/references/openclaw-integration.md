@@ -23,8 +23,8 @@ Add to OpenClaw config (`~/.openclaw/config.json` or `.openclaw/config.json`):
   "plugins": {
     "agent-pulse": {
       "hooks": {
-        "before_tool_call": "npx @eggy.sh/agentpulse hook openclaw",
-        "after_tool_call": "npx @eggy.sh/agentpulse hook openclaw"
+        "before_tool_call": "npx agent-heart hook openclaw",
+        "after_tool_call": "npx agent-heart hook openclaw"
       }
     }
   }
@@ -126,7 +126,7 @@ Skip wrapping for:
 ## How to Wrap
 
 ```bash
-npx @eggy.sh/agentpulse exec \
+npx agent-heart exec \
   --service openclaw/<family> \
   --tool <binary> \
   --resource <resource_kind> \
@@ -137,19 +137,19 @@ npx @eggy.sh/agentpulse exec \
 
 ```bash
 # GitHub operations
-npx @eggy.sh/agentpulse exec --service openclaw/github --tool gh --resource pulls \
+npx agent-heart exec --service openclaw/github --tool gh --resource pulls \
   -- gh pr list --repo myorg/myrepo
 
 # Google Workspace
-npx @eggy.sh/agentpulse exec --service openclaw/google-workspace --tool gws --resource drive \
+npx agent-heart exec --service openclaw/google-workspace --tool gws --resource drive \
   -- gws drive files list --params '{"pageSize": 10}'
 
 # Kubernetes
-npx @eggy.sh/agentpulse exec --service openclaw/kubernetes --tool kubectl --resource pods \
+npx agent-heart exec --service openclaw/kubernetes --tool kubectl --resource pods \
   -- kubectl get pods -n production
 
 # Database queries
-npx @eggy.sh/agentpulse exec --service openclaw/database --tool psql --resource query \
+npx agent-heart exec --service openclaw/database --tool psql --resource query \
   -- psql -c "SELECT count(*) FROM users"
 ```
 ```
@@ -190,7 +190,7 @@ metadata). This is by design.
 ## What You See After Integration
 
 ```bash
-$ npx @eggy.sh/agentpulse status
+$ npx agent-heart status
 
 SERVICE                   STATUS      RUNS  STALE  DEAD
 openclaw/github           completed      3      0     0
@@ -202,7 +202,7 @@ openclaw/browser          completed      2      0     0
 Detailed view:
 
 ```bash
-$ npx @eggy.sh/agentpulse runs --service openclaw/github
+$ npx agent-heart runs --service openclaw/github
 
 RUN ID       TOOL     RESOURCE  STATUS     DURATION   EXIT
 nk8f2a...    gh       pulls     completed  1.2s       0
@@ -216,13 +216,13 @@ m4p7q2...    gh       actions   completed  2.1s       0
 
 **Hook not firing:** Test manually:
 ```bash
-echo '{"event":"before_tool_call","tool":"exec","params":{"command":"echo hello"},"session":{"id":"test"}}' | npx @eggy.sh/agentpulse hook openclaw
+echo '{"event":"before_tool_call","tool":"exec","params":{"command":"echo hello"},"session":{"id":"test"}}' | npx agent-heart hook openclaw
 ```
 
 **Skill not loading:** Verify location and that `agent-pulse` is available:
 ```bash
 ls ~/.openclaw/skills/agent-pulse-observability/SKILL.md
-npx @eggy.sh/agentpulse --version
+npx agent-heart --version
 ```
 
 **Duplicate runs in hybrid mode:** Expected — the hook tracks the outer tool

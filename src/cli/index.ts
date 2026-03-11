@@ -15,11 +15,11 @@ export function createProgram(): Command {
   const program = new Command();
 
   program
-    .name("agentpulse")
+    .name("agent-heart")
     .description(
       "CLI-first observability layer for AI agents — lifecycle tracking, stuck-run detection, and silent failure alerts",
     )
-    .version("0.1.0")
+    .version("0.2.0")
     .option("--json", "Output as JSON for machine-readable consumption")
     .option("--server <url>", "Override the server URL");
 

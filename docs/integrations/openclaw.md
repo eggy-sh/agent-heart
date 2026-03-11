@@ -11,15 +11,15 @@ OpenClaw agents execute dozens of CLI commands in a single session: `gh pr list`
 - How long did each operation take?
 - Which services and resources were accessed?
 
-`agent-pulse` fills this gap by tracking every tool call through the lock/beat/unlock lifecycle. Commands that hang are detected as stale, and commands that disappear are flagged as dead.
+`agent-heart` fills this gap by tracking every tool call through the lock/beat/unlock lifecycle. Commands that hang are detected as stale, and commands that disappear are flagged as dead.
 
 ## Integration Approaches
 
-There are three ways to integrate agent-pulse with OpenClaw. You can use any one alone, or combine them.
+There are three ways to integrate agent-heart with OpenClaw. You can use any one alone, or combine them.
 
 ### Approach 1: Skill-Based (Agent-Driven)
 
-Teach the OpenClaw agent to wrap important commands with `agent-pulse exec`. The agent decides when tracking matters based on the skill instructions.
+Teach the OpenClaw agent to wrap important commands with `agent-heart exec`. The agent decides when tracking matters based on the skill instructions.
 
 **Best for**: Enriched metadata, selective tracking of high-value operations.
 
@@ -35,13 +35,13 @@ npx agent-heart server start
 2. Copy the skill file into your OpenClaw skills directory:
 
 ```bash
-cp examples/openclaw/SKILL.md ~/.openclaw/skills/agent-pulse-observability/SKILL.md
+cp examples/openclaw/SKILL.md ~/.openclaw/skills/agent-heart-observability/SKILL.md
 ```
 
 Or, if using a project-level skills directory:
 
 ```bash
-cp examples/openclaw/SKILL.md .openclaw/skills/agent-pulse-observability/SKILL.md
+cp examples/openclaw/SKILL.md .openclaw/skills/agent-heart-observability/SKILL.md
 ```
 
 3. The agent will now see the skill and use `npx agent-heart exec` wrappers when appropriate.
@@ -62,7 +62,7 @@ The agent will skip wrapping trivial commands like `echo`, `cat`, `ls`, and othe
 
 ### Approach 2: Plugin Hooks (Automatic)
 
-Configure OpenClaw's plugin system to send `before_tool_call` and `after_tool_call` events to agent-pulse. Every exec tool call is tracked automatically with no agent involvement.
+Configure OpenClaw's plugin system to send `before_tool_call` and `after_tool_call` events to agent-heart. Every exec tool call is tracked automatically with no agent involvement.
 
 **Best for**: Full coverage with zero agent overhead, catch-all monitoring.
 
@@ -80,7 +80,7 @@ npx agent-heart server start
 ```json
 {
   "plugins": {
-    "agent-pulse": {
+    "agent-heart": {
       "hooks": {
         "before_tool_call": "npx agent-heart hook openclaw",
         "after_tool_call": "npx agent-heart hook openclaw"
@@ -90,7 +90,7 @@ npx agent-heart server start
 }
 ```
 
-That is it. OpenClaw will pipe event JSON to agent-pulse on every tool call.
+That is it. OpenClaw will pipe event JSON to agent-heart on every tool call.
 
 #### How It Works
 
@@ -162,7 +162,7 @@ $ npx agent-heart status --json
 
 ## Event Mapping Reference
 
-| OpenClaw Event | agent-pulse Action | Service Name | Details |
+| OpenClaw Event | agent-heart Action | Service Name | Details |
 |---|---|---|---|
 | `before_tool_call` (exec) | `lock` | `openclaw/<command_family>` | Tracks command start |
 | `after_tool_call` (exec) | `unlock` | `openclaw/<command_family>` | Records exit code and duration |
@@ -191,17 +191,17 @@ The hook handler maps CLI binaries to command families:
 
 ### Hook not firing
 
-Make sure `agent-pulse` is available via `npx`. Test by piping a sample event manually:
+Make sure `agent-heart` is available via `npx`. Test by piping a sample event manually:
 
 ```bash
 echo '{"event":"before_tool_call","tool":"exec","params":{"command":"echo hello"},"session":{"id":"test"}}' | npx agent-heart hook openclaw
 ```
 
-Check for errors in the output. If you see `[agent-pulse] Failed to parse OpenClaw hook event JSON`, the JSON input is malformed.
+Check for errors in the output. If you see `[agent-heart] Failed to parse OpenClaw hook event JSON`, the JSON input is malformed.
 
 ### Server not reachable
 
-Ensure the agent-pulse server is running:
+Ensure the agent-heart server is running:
 
 ```bash
 npx agent-heart server start
@@ -228,10 +228,10 @@ echo '{"event":"before_tool_call","tool":"exec","params":{"command":"gh pr list"
 Verify the skill file is in the correct location:
 
 ```bash
-ls ~/.openclaw/skills/agent-pulse-observability/SKILL.md
+ls ~/.openclaw/skills/agent-heart-observability/SKILL.md
 ```
 
-Make sure the YAML frontmatter is valid. Verify `agent-pulse` is available:
+Make sure the YAML frontmatter is valid. Verify `agent-heart` is available:
 
 ```bash
 npx agent-heart --version
@@ -239,7 +239,7 @@ npx agent-heart --version
 
 ### Redaction
 
-agent-pulse redacts sensitive values from commands before storing them. If you see `[REDACTED]` in your run data, this is working as intended. To adjust which patterns are redacted, edit `~/.agent-pulse/config.json`:
+agent-heart redacts sensitive values from commands before storing them. If you see `[REDACTED]` in your run data, this is working as intended. To adjust which patterns are redacted, edit `~/.agent-heart/config.json`:
 
 ```json
 {
@@ -252,4 +252,4 @@ agent-pulse redacts sensitive values from commands before storing them. If you s
 
 ### Duplicate runs in hybrid mode
 
-When using both hooks and skills (Approach 3), you will see two runs for commands that the agent wraps with `agent-pulse exec`. This is expected. The hook-created run tracks the outer exec tool call, while the skill-created run tracks the inner command with richer metadata. Filter by service name to see only the runs you care about.
+When using both hooks and skills (Approach 3), you will see two runs for commands that the agent wraps with `agent-heart exec`. This is expected. The hook-created run tracks the outer exec tool call, while the skill-created run tracks the inner command with richer metadata. Filter by service name to see only the runs you care about.

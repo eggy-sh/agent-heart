@@ -28,7 +28,7 @@ Google's CLI gives access to Drive. `/loop` gives scheduling. Claude Code hooks 
 
 That's the gap. The resource planes are maturing fast. The observability plane barely exists.
 
-`agent-pulse` sits in that gap. Not as another framework. Not as another dashboard. As a thin runtime ledger that answers the most basic operational question: did the agent's work actually land?
+`agent-heart` sits in that gap. Not as another framework. Not as another dashboard. As a thin runtime ledger that answers the most basic operational question: did the agent's work actually land?
 
 ---
 
@@ -36,13 +36,13 @@ That's the gap. The resource planes are maturing fast. The observability plane b
 
 Claude Code's `/loop` command runs a prompt on a recurring interval inside your session. Think of it as cron for your agent. You type `/loop 5m check the deploy` and Claude runs that check every five minutes until you stop it or close the session.
 
-Pair that with `agent-pulse` and you get something that didn't exist before: **an agent that monitors its own work in real time.**
+Pair that with `agent-heart` and you get something that didn't exist before: **an agent that monitors its own work in real time.**
 
 ```
 /loop 3m check npx agent-heart runs --status stale --json and tell me if anything is stuck
 ```
 
-That one line creates a background watcher. Every three minutes, Claude queries agent-pulse, looks for stale or dead runs, and surfaces problems before you notice them yourself. The hooks record what the agent does. The loop watches whether it's going well.
+That one line creates a background watcher. Every three minutes, Claude queries agent-heart, looks for stale or dead runs, and surfaces problems before you notice them yourself. The hooks record what the agent does. The loop watches whether it's going well.
 
 ### Patterns That Work
 

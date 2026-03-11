@@ -4,7 +4,7 @@ import { log, chrome } from "../../utils/logger.js";
 
 export function makeServerCommand(): Command {
   const server = new Command("server").description(
-    "Manage the agent-pulse server",
+    "Manage the agent-heart server",
   );
 
   server
@@ -25,7 +25,7 @@ export function makeServerCommand(): Command {
         config.database.path = opts.db;
       }
 
-      const spinner = ora({ text: "Starting agent-pulse server...", stream: process.stderr }).start();
+      const spinner = ora({ text: "Starting agent-heart server...", stream: process.stderr }).start();
 
       try {
         const { startServer } = await import("../../server/index.js");
@@ -42,7 +42,7 @@ export function makeServerCommand(): Command {
 
         chrome.blank();
         chrome.log(
-          chalk.bold.cyan("  agent-pulse server"),
+          chalk.bold.cyan("  agent-heart server"),
         );
         chrome.log(
           chalk.dim("  ─────────────────────────────────"),

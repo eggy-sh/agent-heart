@@ -63,7 +63,7 @@ That's the tool use pattern. The agent has a library of tools -- Bash commands, 
 
 This is where observability comes in. If step 3 takes forever (the command hangs), the agent is stuck. If step 5 returns failure (exit code 1), the agent needs to retry or try something else. If the process dies at step 2 (network error, auth failure), you get a silent disappearance.
 
-`agent-pulse` wraps this cycle: `lock` before the command, `beat` while it runs, `unlock` when it finishes. Now you can see the lifecycle from the outside.
+`agent-heart` wraps this cycle: `lock` before the command, `beat` while it runs, `unlock` when it finishes. Now you can see the lifecycle from the outside.
 
 ---
 
@@ -120,7 +120,7 @@ echo "Done."
 
 Save it as `deploy.sh`, run `chmod +x deploy.sh`, and now `./deploy.sh` runs all four steps. You just built a CLI.
 
-Wrap it with agent-pulse and you get lifecycle tracking for free:
+Wrap it with agent-heart and you get lifecycle tracking for free:
 
 ```bash
 npx agent-heart exec --service deploy --tool bash --resource production -- ./deploy.sh
@@ -168,7 +168,7 @@ python deploy.py --help
 python deploy.py v2.3.1 --environment production
 ```
 
-**For TypeScript/Node:** Commander or oclif. Same idea -- define commands, flags, and arguments in code. `agent-pulse` itself is built with Commander.
+**For TypeScript/Node:** Commander or oclif. Same idea -- define commands, flags, and arguments in code. `agent-heart` itself is built with Commander.
 
 **For Go:** Cobra. Used by `kubectl`, `gh`, `docker`, and most of the tools agents already rely on.
 
@@ -202,7 +202,7 @@ my-tool status --json
 my-tool fetch --json 2>/dev/null | jq '.items'
 ```
 
-`agent-pulse` follows all three of these patterns. That's not an accident -- it's designed to be used by the same agents it observes.
+`agent-heart` follows all three of these patterns. That's not an accident -- it's designed to be used by the same agents it observes.
 
 ---
 
@@ -217,7 +217,7 @@ The loop looks like this:
 1. You have a workflow you repeat manually
 2. You describe it to an AI agent
 3. The agent writes a script or CLI
-4. You wrap it with `agent-pulse` so you can see when it runs and whether it succeeds
+4. You wrap it with `agent-heart` so you can see when it runs and whether it succeeds
 5. Other agents can now call your CLI as a tool
 
 That last step is the interesting one. Your CLI becomes a building block. Other agents can discover it, call it, chain it with other tools. The same composability that made Unix pipes powerful in 1973 makes agent tool chains powerful now.
@@ -229,5 +229,5 @@ You don't need to be an engineer to build that. You need to understand the gramm
 ## What to Read Next
 
 - [CLI Literacy](./cli-literacy.md) -- If you skipped ahead, go back for the fundamentals. The grammar model, the three streams, and how to read any command.
-- [Scenarios](../scenarios.md) -- Real workflows showing CLIs and agent-pulse in action together.
+- [Scenarios](../scenarios.md) -- Real workflows showing CLIs and agent-heart in action together.
 - [Why Agent Observability](../why-agent-observability.md) -- The market context for why this all matters now.

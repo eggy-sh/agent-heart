@@ -5,7 +5,7 @@
     {
       "text": "includes_setup_steps",
       "passed": false,
-      "evidence": "Has 'npm install -g agent-pulse' but says 'agent-pulse start' instead of 'agent-pulse init' + 'agent-pulse server start'. Missing correct setup sequence."
+      "evidence": "Has 'npm install -g agent-heart' but says 'agent-heart start' instead of 'agent-heart init' + 'agent-heart server start'. Missing correct setup sequence."
     },
     {
       "text": "provides_callback_handler",
@@ -20,7 +20,7 @@
     {
       "text": "mentions_stale_detection",
       "passed": true,
-      "evidence": "Mentions 'stale' and 'dead' states, 'agent-pulse stale' and 'agent-pulse dead' CLI commands"
+      "evidence": "Mentions 'stale' and 'dead' states, 'agent-heart stale' and 'agent-heart dead' CLI commands"
     },
     {
       "text": "includes_usage_example",

@@ -1,6 +1,6 @@
 # Claude Code Hooks Integration
 
-This guide explains how to use `agent-pulse` with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) hooks to automatically track every tool call in an agent session.
+This guide explains how to use `agent-heart` with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) hooks to automatically track every tool call in an agent session.
 
 ## How Claude Code Hooks Work
 
@@ -79,7 +79,7 @@ Create or edit `.claude/settings.json` in your project root:
 }
 ```
 
-That is it. Every tool call in your Claude Code session will now be tracked by `agent-pulse`.
+That is it. Every tool call in your Claude Code session will now be tracked by `agent-heart`.
 
 ## What Gets Tracked
 
@@ -110,7 +110,7 @@ claude-code/Bash       active       1      0     0
 
 ## How Hook Events Map to Lifecycle
 
-| Claude Code Event | agent-pulse Action | Service Name | Details |
+| Claude Code Event | agent-heart Action | Service Name | Details |
 |---|---|---|---|
 | `SessionStart` | `lock` | `claude-code/session` | Creates session run |
 | `PreToolUse` | `lock` | `claude-code/<tool_name>` | Creates tool-call run |
@@ -176,7 +176,7 @@ The `npx agent-heart beat claude-code/session` call in `PreToolUse` ensures the 
 
 ## Privacy and Redaction
 
-By default, `agent-pulse` redacts sensitive values from tool call parameters before storing them. The following patterns are redacted:
+By default, `agent-heart` redacts sensitive values from tool call parameters before storing them. The following patterns are redacted:
 
 - `password`, `secret`, `token`, `key`, `auth`, `credential`, `api_key`, `apikey`
 
@@ -184,7 +184,7 @@ This means if a tool call includes `--token ghp_abc123`, it will be stored as `-
 
 ### Configuring Redaction
 
-Edit `~/.agent-pulse/config.json`:
+Edit `~/.agent-heart/config.json`:
 
 ```json
 {
@@ -208,7 +208,7 @@ Edit `~/.agent-pulse/config.json`:
 
 ### What Is Stored
 
-For each tool call, `agent-pulse` stores:
+For each tool call, `agent-heart` stores:
 
 - Tool name (e.g., `Bash`, `Read`, `Write`)
 - Redacted command/input summary
@@ -269,7 +269,7 @@ See [`src/hooks/claude-code.ts`](../src/hooks/claude-code.ts) for the full imple
 
 ## Troubleshooting
 
-**Hook not firing**: Make sure `agent-pulse` is available via `npx`. Test by running the hook command manually.
+**Hook not firing**: Make sure `agent-heart` is available via `npx`. Test by running the hook command manually.
 
 **Server not reachable**: Ensure `npx agent-heart server start` is running. Check that the port in your config matches (default: 7778).
 

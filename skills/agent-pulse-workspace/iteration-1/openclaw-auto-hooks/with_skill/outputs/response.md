@@ -2,12 +2,12 @@
 
 The easiest setup for automatic observability on all exec tool calls in OpenClaw is **Approach 1: Plugin Hooks**. It requires no changes to your agent logic, no skill files, and no manual wrapping of commands. You configure it once and every exec tool call is tracked automatically.
 
-## Step 1: Install and start agent-pulse
+## Step 1: Install and start agent-heart
 
 ```bash
-npm install -g agent-pulse
-agent-pulse init
-agent-pulse server start
+npm install -g agent-heart
+agent-heart init
+agent-heart server start
 ```
 
 The server runs locally on `127.0.0.1:7778` (SQLite-backed, single process). You can verify it is healthy with:
@@ -18,15 +18,15 @@ curl http://127.0.0.1:7778/api/v1/health
 
 ## Step 2: Add the plugin hook to your OpenClaw config
 
-Open your OpenClaw config file (`~/.openclaw/config.json` or `.openclaw/config.json` in your project) and add the `agent-pulse` plugin entry:
+Open your OpenClaw config file (`~/.openclaw/config.json` or `.openclaw/config.json` in your project) and add the `agent-heart` plugin entry:
 
 ```json
 {
   "plugins": {
-    "agent-pulse": {
+    "agent-heart": {
       "hooks": {
-        "before_tool_call": "npx agent-pulse hook openclaw",
-        "after_tool_call": "npx agent-pulse hook openclaw"
+        "before_tool_call": "npx agent-heart hook openclaw",
+        "after_tool_call": "npx agent-heart hook openclaw"
       }
     }
   }
@@ -37,7 +37,7 @@ That is the entire setup. No skill files, no code changes, no wrapping individua
 
 ## What happens automatically
 
-When any exec tool call fires, OpenClaw pipes event JSON to agent-pulse via the hook. The handler does the following for you:
+When any exec tool call fires, OpenClaw pipes event JSON to agent-heart via the hook. The handler does the following for you:
 
 1. Extracts the binary name from the command (e.g., `gh` from `gh pr list`).
 2. Maps it to a known command family (e.g., `gh` maps to `github`, `kubectl` maps to `kubernetes`).
@@ -73,17 +73,17 @@ After running a few commands through your OpenClaw agent, check the results:
 
 ```bash
 # High-level overview of all tracked services
-agent-pulse overview
+agent-heart overview
 
 # List recent runs
-agent-pulse runs
+agent-heart runs
 
 # Filter to a specific service
-agent-pulse runs --service openclaw/github
+agent-heart runs --service openclaw/github
 
 # Find stuck or failed runs
-agent-pulse runs --status stale
-agent-pulse runs --status dead
+agent-heart runs --status stale
+agent-heart runs --status dead
 ```
 
 Example output:
@@ -98,7 +98,7 @@ openclaw/browser          completed      2      0     0
 
 ## Optional: Tune stale/dead detection thresholds
 
-By default, runs are marked stale after 5 minutes and dead after 10 minutes of silence. If your tool calls have different expected durations, configure per-service thresholds in `~/.agent-pulse/config.json`:
+By default, runs are marked stale after 5 minutes and dead after 10 minutes of silence. If your tool calls have different expected durations, configure per-service thresholds in `~/.agent-heart/config.json`:
 
 ```json
 {
@@ -127,14 +127,14 @@ Set shorter values for fast API calls and longer values for builds or deployment
 **Hook not firing:** Test the hook manually by piping sample JSON:
 
 ```bash
-echo '{"event":"before_tool_call","tool":"exec","params":{"command":"echo hello"},"session":{"id":"test"}}' | npx agent-pulse hook openclaw
+echo '{"event":"before_tool_call","tool":"exec","params":{"command":"echo hello"},"session":{"id":"test"}}' | npx agent-heart hook openclaw
 ```
 
-**Server not reachable:** Make sure the server is running (`agent-pulse server start`) and test with `curl http://127.0.0.1:7778/api/v1/health`.
+**Server not reachable:** Make sure the server is running (`agent-heart server start`) and test with `curl http://127.0.0.1:7778/api/v1/health`.
 
-**Runs stuck as "locked":** The monitor will mark them stale/dead after the configured thresholds. Check with `agent-pulse runs --status locked`.
+**Runs stuck as "locked":** The monitor will mark them stale/dead after the configured thresholds. Check with `agent-heart runs --status locked`.
 
-**Port conflict:** Change the port in `~/.agent-pulse/config.json` under `server.port`.
+**Port conflict:** Change the port in `~/.agent-heart/config.json` under `server.port`.
 
 ## Going further
 

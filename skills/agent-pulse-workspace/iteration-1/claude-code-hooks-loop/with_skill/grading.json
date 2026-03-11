@@ -10,17 +10,17 @@
     {
       "text": "includes_hook_commands",
       "passed": true,
-      "evidence": "Uses 'npx agent-pulse hook claude-code --event pre-tool-use' and similar for all events"
+      "evidence": "Uses 'npx agent-heart hook claude-code --event pre-tool-use' and similar for all events"
     },
     {
       "text": "includes_loop_command",
       "passed": true,
-      "evidence": "Provides '/loop 3m check agent-pulse status for stale or dead runs' plus three more targeted variants"
+      "evidence": "Provides '/loop 3m check agent-heart status for stale or dead runs' plus three more targeted variants"
     },
     {
       "text": "includes_setup_steps",
       "passed": true,
-      "evidence": "Prerequisites section with npm install, agent-pulse init, agent-pulse server start"
+      "evidence": "Prerequisites section with npm install, agent-heart init, agent-heart server start"
     },
     {
       "text": "covers_session_tracking",

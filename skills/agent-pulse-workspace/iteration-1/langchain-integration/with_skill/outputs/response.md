@@ -1,13 +1,13 @@
-# Adding agent-pulse to a LangChain Agent
+# Adding agent-heart to a LangChain Agent
 
-agent-pulse tracks the full lifecycle of every tool call your LangChain agent makes -- start, progress, completion, failure, or disappearance -- so you can see exactly which calls are getting stuck.
+agent-heart tracks the full lifecycle of every tool call your LangChain agent makes -- start, progress, completion, failure, or disappearance -- so you can see exactly which calls are getting stuck.
 
-## Step 1: Install and Start agent-pulse
+## Step 1: Install and Start agent-heart
 
 ```bash
-npm install -g agent-pulse
-agent-pulse init
-agent-pulse server start
+npm install -g agent-heart
+agent-heart init
+agent-heart server start
 ```
 
 The server runs locally on `127.0.0.1:7778` (SQLite-backed). You can verify it is running with:
@@ -21,7 +21,7 @@ curl http://127.0.0.1:7778/api/v1/health
 LangChain's callback system is the natural integration point. Create a file called `agent_pulse_callback.py` alongside your agent code:
 
 ```python
-"""agent_pulse_callback.py -- LangChain callback handler for agent-pulse."""
+"""agent_pulse_callback.py -- LangChain callback handler for agent-heart."""
 
 import subprocess
 import time
@@ -32,7 +32,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 
 
 class AgentPulseCallbackHandler(BaseCallbackHandler):
-    """Track LangChain tool calls via agent-pulse lifecycle events."""
+    """Track LangChain tool calls via agent-heart lifecycle events."""
 
     def __init__(self, service_prefix: str = "langchain", session_id: Optional[str] = None):
         self.service_prefix = service_prefix
@@ -40,10 +40,10 @@ class AgentPulseCallbackHandler(BaseCallbackHandler):
         self._active_runs: Dict[str, str] = {}  # run_id -> service_name
 
     def _pulse_cmd(self, args: List[str]) -> None:
-        """Fire-and-forget agent-pulse CLI call."""
+        """Fire-and-forget agent-heart CLI call."""
         try:
             subprocess.run(
-                ["agent-pulse", "hook", "generic"] + args,
+                ["agent-heart", "hook", "generic"] + args,
                 capture_output=True,
                 timeout=5,
             )
@@ -111,11 +111,11 @@ class AgentPulseCallbackHandler(BaseCallbackHandler):
 
 The handler hooks into three LangChain callback events:
 
-- **`on_tool_start`** sends a `lock` event to agent-pulse, recording which tool was invoked and what input it received. This is the moment the clock starts ticking.
-- **`on_tool_end`** sends an `unlock` event with exit code 0, telling agent-pulse the tool finished successfully.
+- **`on_tool_start`** sends a `lock` event to agent-heart, recording which tool was invoked and what input it received. This is the moment the clock starts ticking.
+- **`on_tool_end`** sends an `unlock` event with exit code 0, telling agent-heart the tool finished successfully.
 - **`on_tool_error`** sends an `unlock` event with exit code 1 and the error message, so you can see what failed.
 
-If a tool call starts (lock) but never finishes (no unlock), agent-pulse will flag it as **stale** (stuck longer than expected) or **dead** (no heartbeat at all). That is exactly how you detect which tool calls are getting stuck.
+If a tool call starts (lock) but never finishes (no unlock), agent-heart will flag it as **stale** (stuck longer than expected) or **dead** (no heartbeat at all). That is exactly how you detect which tool calls are getting stuck.
 
 ## Step 3: Attach the Handler to Your Agent
 
@@ -145,23 +145,23 @@ That is all the code changes you need. Every tool call your agent makes will now
 
 ## Step 4: Find Stuck Tool Calls
 
-Once your agent has run, use the agent-pulse CLI to inspect what happened:
+Once your agent has run, use the agent-heart CLI to inspect what happened:
 
 ```bash
 # See an overview of all tracked services
-agent-pulse overview
+agent-heart overview
 
 # List all recent runs
-agent-pulse runs
+agent-heart runs
 
 # Filter to only your LangChain agent's runs
-agent-pulse runs --service langchain
+agent-heart runs --service langchain
 
 # Find stuck tool calls (locked but never unlocked)
-agent-pulse runs --status stale
+agent-heart runs --status stale
 
 # Find silently failed calls (no heartbeat received)
-agent-pulse runs --status dead
+agent-heart runs --status dead
 ```
 
 - **stale** means the tool call started but has been running longer than expected (stuck).
@@ -171,7 +171,7 @@ Both of these are the signals you want for detecting which tool calls are gettin
 
 ## Step 5: Tune Detection Thresholds
 
-By default, agent-pulse uses generous thresholds (5 minutes for stale, 10 minutes for dead). If your tools are expected to be fast, tighten these per service in `~/.agent-pulse/config.json`:
+By default, agent-heart uses generous thresholds (5 minutes for stale, 10 minutes for dead). If your tools are expected to be fast, tighten these per service in `~/.agent-heart/config.json`:
 
 ```json
 {
@@ -278,9 +278,9 @@ result = app.invoke(initial_state, config={"callbacks": [pulse]})
 
 ## Summary
 
-1. Install agent-pulse and start its server.
+1. Install agent-heart and start its server.
 2. Create `AgentPulseCallbackHandler` (the file above).
 3. Pass it as a callback to your LLM and executor.
 4. Run your agent as normal.
-5. Use `agent-pulse runs --status stale` and `agent-pulse runs --status dead` to find stuck tool calls.
+5. Use `agent-heart runs --status stale` and `agent-heart runs --status dead` to find stuck tool calls.
 6. Optionally tune `expected_cycle_ms` and `max_silence_ms` per tool in the config to control how quickly stuck calls are flagged.

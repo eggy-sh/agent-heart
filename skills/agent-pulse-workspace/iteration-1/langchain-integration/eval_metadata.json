@@ -1,13 +1,13 @@
 {
   "eval_id": 0,
   "eval_name": "langchain-integration",
-  "prompt": "I have a LangChain agent that calls several tools. I want to track which tool calls are getting stuck. How do I add agent-pulse?",
+  "prompt": "I have a LangChain agent that calls several tools. I want to track which tool calls are getting stuck. How do I add agent-heart?",
   "assertions": [
     {
       "name": "includes_setup_steps",
-      "description": "Mentions npm install, agent-pulse init, and server start",
+      "description": "Mentions npm install, agent-heart init, and server start",
       "type": "contains_all",
-      "values": ["npm install", "agent-pulse init", "server start"]
+      "values": ["npm install", "agent-heart init", "server start"]
     },
     {
       "name": "provides_callback_handler",

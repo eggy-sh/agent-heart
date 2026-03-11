@@ -10,7 +10,7 @@
     {
       "text": "includes_config_json",
       "passed": false,
-      "evidence": "Does not provide the correct OpenClaw config.json format. Shows invented shell commands like 'agent-pulse exec --lock --stdin' instead of 'npx agent-pulse hook openclaw'."
+      "evidence": "Does not provide the correct OpenClaw config.json format. Shows invented shell commands like 'agent-heart exec --lock --stdin' instead of 'npx agent-heart hook openclaw'."
     },
     {
       "text": "explains_command_family_mapping",
@@ -20,7 +20,7 @@
     {
       "text": "includes_setup_steps",
       "passed": true,
-      "evidence": "Has 'npm install -g agent-pulse' for installation"
+      "evidence": "Has 'npm install -g agent-heart' for installation"
     },
     {
       "text": "mentions_automatic_tracking",

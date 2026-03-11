@@ -13,7 +13,7 @@
       "name": "includes_config_json",
       "description": "Provides the OpenClaw config.json with hook configuration",
       "type": "contains_all",
-      "values": ["config.json", "agent-pulse hook openclaw"]
+      "values": ["config.json", "agent-heart hook openclaw"]
     },
     {
       "name": "explains_command_family_mapping",
@@ -23,7 +23,7 @@
     },
     {
       "name": "includes_setup_steps",
-      "description": "Mentions installing and starting agent-pulse",
+      "description": "Mentions installing and starting agent-heart",
       "type": "contains_any",
       "values": ["npm install", "server start"]
     },

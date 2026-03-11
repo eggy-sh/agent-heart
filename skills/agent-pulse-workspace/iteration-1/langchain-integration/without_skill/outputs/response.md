@@ -1,30 +1,30 @@
-# Adding agent-pulse to a LangChain Agent
+# Adding agent-heart to a LangChain Agent
 
 ## Overview
 
-agent-pulse gives you CLI-first observability for AI agent tool calls. It tracks each tool invocation through a lifecycle of **lock** (start), **beat** (heartbeat), and **unlock** (finish), and can automatically detect **stale** (stuck) and **dead** (silently failed) runs. Below is a step-by-step guide to wiring it into a LangChain agent.
+agent-heart gives you CLI-first observability for AI agent tool calls. It tracks each tool invocation through a lifecycle of **lock** (start), **beat** (heartbeat), and **unlock** (finish), and can automatically detect **stale** (stuck) and **dead** (silently failed) runs. Below is a step-by-step guide to wiring it into a LangChain agent.
 
 ---
 
-## 1. Install agent-pulse
+## 1. Install agent-heart
 
 ```bash
-npm install -g agent-pulse
+npm install -g agent-heart
 ```
 
-This gives you access to the `agent-pulse` CLI, the HTTP API (when you run the daemon/server), and the TypeScript SDK you can import directly into your code.
+This gives you access to the `agent-heart` CLI, the HTTP API (when you run the daemon/server), and the TypeScript SDK you can import directly into your code.
 
 ---
 
-## 2. Start the agent-pulse server
+## 2. Start the agent-heart server
 
-Before your agent runs, start the agent-pulse background process so it can receive lifecycle events:
+Before your agent runs, start the agent-heart background process so it can receive lifecycle events:
 
 ```bash
-agent-pulse start
+agent-heart start
 ```
 
-By default this starts an HTTP API on a local port (check `agent-pulse --help` for configuration options like port selection). Keep this running in a separate terminal or as a background service.
+By default this starts an HTTP API on a local port (check `agent-heart --help` for configuration options like port selection). Keep this running in a separate terminal or as a background service.
 
 ---
 
@@ -43,7 +43,7 @@ The core idea is to wrap each tool invocation with three lifecycle calls:
 If your LangChain agent is written in TypeScript/JavaScript, import the SDK directly:
 
 ```typescript
-import { AgentPulse } from "agent-pulse";
+import { AgentPulse } from "agent-heart";
 
 const pulse = new AgentPulse();
 
@@ -62,7 +62,7 @@ async function instrumentedToolCall(toolName: string, toolFn: () => Promise<any>
 
     return result;
   } catch (error) {
-    // Signal failure — without this, agent-pulse would eventually flag the run as "dead"
+    // Signal failure — without this, agent-heart would eventually flag the run as "dead"
     await pulse.unlock(runId, { status: "error", error: String(error) });
     throw error;
   }
@@ -94,9 +94,9 @@ def unlock(run_id: str, status: str = "success"):
 For quick testing or shell-based agents, use the CLI directly:
 
 ```bash
-agent-pulse lock --run-id "search-1234" --tool "web_search"
+agent-heart lock --run-id "search-1234" --tool "web_search"
 # ... tool executes ...
-agent-pulse unlock --run-id "search-1234" --status success
+agent-heart unlock --run-id "search-1234" --status success
 ```
 
 ---
@@ -107,12 +107,12 @@ LangChain provides a callback system that fires events on tool start and tool en
 
 ```typescript
 import { BaseCallbackHandler } from "langchain/callbacks";
-import { AgentPulse } from "agent-pulse";
+import { AgentPulse } from "agent-heart";
 
 const pulse = new AgentPulse();
 
 class AgentPulseCallbackHandler extends BaseCallbackHandler {
-  name = "agent-pulse-handler";
+  name = "agent-heart-handler";
 
   async handleToolStart(
     tool: { name: string },
@@ -151,7 +151,7 @@ With this approach, every tool call your LangChain agent makes will automaticall
 
 ## 5. Add heartbeats for long-running tools
 
-If any of your tools take a long time (e.g., web scraping, database queries, API calls with retries), add periodic heartbeats so agent-pulse can distinguish "still working" from "stuck":
+If any of your tools take a long time (e.g., web scraping, database queries, API calls with retries), add periodic heartbeats so agent-heart can distinguish "still working" from "stuck":
 
 ```typescript
 async function longRunningToolWithHeartbeat(runId: string, toolFn: () => Promise<any>) {
@@ -167,7 +167,7 @@ async function longRunningToolWithHeartbeat(runId: string, toolFn: () => Promise
 }
 ```
 
-Without heartbeats, agent-pulse will flag a long-running tool as **stale** after its configured timeout.
+Without heartbeats, agent-heart will flag a long-running tool as **stale** after its configured timeout.
 
 ---
 
@@ -177,16 +177,16 @@ Once your agent is running with instrumentation, use the CLI to monitor:
 
 ```bash
 # View all active (locked) tool calls
-agent-pulse status
+agent-heart status
 
 # View tool calls that have gone stale (no heartbeat, not unlocked)
-agent-pulse stale
+agent-heart stale
 
 # View tool calls flagged as dead (silent failures)
-agent-pulse dead
+agent-heart dead
 
 # Watch tool call activity in real time
-agent-pulse watch
+agent-heart watch
 ```
 
 ---
@@ -195,10 +195,10 @@ agent-pulse watch
 
 | Step | Action |
 |---|---|
-| Install | `npm install -g agent-pulse` |
-| Start server | `agent-pulse start` |
+| Install | `npm install -g agent-heart` |
+| Start server | `agent-heart start` |
 | Instrument | Use LangChain callbacks to call `lock` on tool start and `unlock` on tool end/error |
 | Heartbeat | Call `beat` periodically for long-running tools |
-| Monitor | Use `agent-pulse status`, `agent-pulse stale`, `agent-pulse dead` to find stuck calls |
+| Monitor | Use `agent-heart status`, `agent-heart stale`, `agent-heart dead` to find stuck calls |
 
-The LangChain callback approach is the least-invasive integration path: you write one callback handler and every tool in your agent is automatically tracked. From there, agent-pulse handles detection of stale and dead runs so you can quickly identify which tool calls are getting stuck.
+The LangChain callback approach is the least-invasive integration path: you write one callback handler and every tool in your agent is automatically tracked. From there, agent-heart handles detection of stale and dead runs so you can quickly identify which tool calls are getting stuck.

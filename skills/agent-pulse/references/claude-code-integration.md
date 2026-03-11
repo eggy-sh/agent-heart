@@ -1,6 +1,6 @@
 # Claude Code Integration
 
-This reference covers two complementary approaches for using agent-pulse with
+This reference covers two complementary approaches for using agent-heart with
 Claude Code:
 
 1. **Hooks** — automatic tool-call tracking via Claude Code lifecycle hooks
@@ -14,7 +14,7 @@ Use hooks for tracking. Use /loop for watching. Best results come from both.
 
 Claude Code emits lifecycle events at four points:
 
-| Hook | When | agent-pulse Action |
+| Hook | When | agent-heart Action |
 |---|---|---|
 | `SessionStart` | Session begins | `lock` on `claude-code/session` |
 | `PreToolUse` | Before each tool call | `lock` on `claude-code/<tool_name>` |
@@ -77,7 +77,7 @@ Create or edit `.claude/settings.json` in the project root (or
 }
 ```
 
-Claude Code pipes event JSON to stdin for each hook. The agent-pulse handler
+Claude Code pipes event JSON to stdin for each hook. The agent-heart handler
 parses it and sends the appropriate lifecycle event.
 
 ### What Gets Tracked
@@ -178,7 +178,7 @@ await handlePreToolUse(data);
 ## Part 2: /loop Monitoring
 
 Claude Code's `/loop` command runs a prompt on a recurring schedule within the
-session. Combined with agent-pulse, this creates a live monitoring loop that
+session. Combined with agent-heart, this creates a live monitoring loop that
 watches for stuck runs, dead sessions, and anomalies while you work.
 
 ### Basic Monitoring Loop
@@ -187,7 +187,7 @@ watches for stuck runs, dead sessions, and anomalies while you work.
 /loop 5m check npx agent-heart status for any stale or dead runs and alert me
 ```
 
-This asks Claude to run `agent-pulse overview --json` every 5 minutes and
+This asks Claude to run `agent-heart overview --json` every 5 minutes and
 report anything that looks concerning.
 
 ### Recommended Monitoring Loops
@@ -249,25 +249,25 @@ Then, at the start of a work session:
 - Cancel a loop: "cancel the stale run watcher"
 - Maximum 50 scheduled tasks per session
 
-### One-Shot Reminders with agent-pulse
+### One-Shot Reminders with agent-heart
 
 For non-recurring checks:
 
 ```text
-in 30 minutes, check agent-pulse overview and tell me if the deploy service completed
+in 30 minutes, check agent-heart overview and tell me if the deploy service completed
 ```
 
 ```text
-remind me at 3pm to check agent-pulse for any dead runs from today's session
+remind me at 3pm to check agent-heart for any dead runs from today's session
 ```
 
 These create a single-fire task that runs once and deletes itself.
 
 ---
 
-## Example: Full Claude Code + agent-pulse Setup
+## Example: Full Claude Code + agent-heart Setup
 
-**Step 1: Install and start agent-pulse**
+**Step 1: Install and start agent-heart**
 ```bash
 npx agent-heart init
 npx agent-heart server start

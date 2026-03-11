@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
-# Example: Track a kubectl command with agent-pulse
+# Example: Track a kubectl command with agent-heart
 #
 # This wraps `kubectl get pods` with automatic lifecycle tracking.
-# agent-pulse will:
+# agent-heart will:
 #   1. Lock a run before the command starts
 #   2. Send periodic heartbeats while it runs
 #   3. Unlock the run when it finishes (with exit code and duration)
 #
-# If the command hangs (e.g., waiting for API server), agent-pulse
+# If the command hangs (e.g., waiting for API server), agent-heart
 # will detect the missing heartbeat and mark the run as stale, then dead.
 #
 # Prerequisites:
-#   - agent-pulse installed: npm install -g agent-pulse
-#   - agent-pulse server running: agent-pulse server start
+#   - agent-heart installed: npm install -g agent-heart
+#   - agent-heart server running: agent-heart server start
 #   - kubectl installed and configured
 
 set -euo pipefail
 
 # Basic usage — wraps the command with full lifecycle tracking
-agent-pulse exec \
+agent-heart exec \
   --service k8s \
   --tool kubectl \
   --resource pods \
   -- kubectl get pods -n default
 
 # With additional metadata for a specific operation
-# agent-pulse exec \
+# agent-heart exec \
 #   --service k8s \
 #   --tool kubectl \
 #   --resource deployments \
@@ -35,7 +35,7 @@ agent-pulse exec \
 #   -- kubectl rollout status deployment/my-app -n default
 
 # Tracking a potentially long-running operation with a shorter heartbeat interval
-# agent-pulse exec \
+# agent-heart exec \
 #   --service k8s \
 #   --tool kubectl \
 #   --resource pods \

@@ -1,8 +1,8 @@
 {
   "$schema": "https://openclaw.dev/schemas/plugin-config.json",
-  "_comment": "Sample OpenClaw plugin configuration for agent-pulse. Add the 'plugins' object to your OpenClaw config file (~/.openclaw/config.json or .openclaw/config.json).",
+  "_comment": "Sample OpenClaw plugin configuration for agent-heart. Add the 'plugins' object to your OpenClaw config file (~/.openclaw/config.json or .openclaw/config.json).",
   "plugins": {
-    "agent-pulse": {
+    "agent-heart": {
       "hooks": {
         "before_tool_call": "npx agent-heart hook openclaw",
         "after_tool_call": "npx agent-heart hook openclaw"

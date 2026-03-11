@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
-# Example: Track a GitHub CLI command with agent-pulse
+# Example: Track a GitHub CLI command with agent-heart
 #
 # This wraps `gh pr list` with automatic lifecycle tracking.
-# agent-pulse will:
+# agent-heart will:
 #   1. Lock a run before the command starts
 #   2. Send periodic heartbeats while it runs
 #   3. Unlock the run when it finishes (with exit code and duration)
 #
-# If the command hangs or the process dies, agent-pulse will detect
+# If the command hangs or the process dies, agent-heart will detect
 # the missing heartbeat and mark the run as stale, then dead.
 #
 # Prerequisites:
-#   - agent-pulse installed: npm install -g agent-pulse
-#   - agent-pulse server running: agent-pulse server start
+#   - agent-heart installed: npm install -g agent-heart
+#   - agent-heart server running: agent-heart server start
 #   - gh CLI installed and authenticated
 
 set -euo pipefail
 
 # Basic usage — wraps the command with full lifecycle tracking
-agent-pulse exec \
+agent-heart exec \
   --service github \
   --tool gh \
   --resource pulls \
   -- gh pr list --repo owner/repo
 
 # With additional metadata
-# agent-pulse exec \
+# agent-heart exec \
 #   --service github \
 #   --tool gh \
 #   --resource pulls \

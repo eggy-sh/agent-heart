@@ -45,7 +45,7 @@ export function makeGwsCommand(): Command {
       const quiet = opts.quiet === true || !process.stdout.isTTY;
 
       // Collect all args after "gws" subcommand from process.argv.
-      // Commander will have consumed "agent-pulse" and "gws" but the
+      // Commander will have consumed "agent-heart" and "gws" but the
       // remaining tokens (including gws flags) are left in process.argv.
       const gwsArgs = extractGwsArgs(process.argv);
 
@@ -392,10 +392,10 @@ Options:
  * Extract gws arguments from the full process.argv.
  *
  * process.argv looks like:
- *   ["node", "agent-pulse", "gws", "drive", "files", "list", "--params", "..."]
+ *   ["node", "agent-heart", "gws", "drive", "files", "list", "--params", "..."]
  *
  * We need everything after the "gws" subcommand, but we must skip any
- * agent-pulse-level flags that appear before or mixed in.
+ * agent-heart-level flags that appear before or mixed in.
  * Commander processes its own flags (--quiet, --session, --json, --server, etc.)
  * but the gws positionals and gws-specific flags need to pass through.
  */
@@ -406,7 +406,7 @@ function extractGwsArgs(argv: string[]): string[] {
 
   const afterGws = argv.slice(gwsIndex + 1);
 
-  // Filter out agent-pulse flags that Commander may not have consumed
+  // Filter out agent-heart flags that Commander may not have consumed
   // since we use allowUnknownOption. The gws command's own flags
   // (--session, --quiet, --heartbeat-interval, --metadata) are consumed
   // by Commander. Everything else passes through to gws.

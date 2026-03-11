@@ -1,22 +1,22 @@
 ---
-name: agent-pulse
+name: agent-heart
 description: >
-  Integrate agent-pulse observability into agentic projects and frameworks.
-  agent-pulse is a CLI-first observability layer that tracks AI agent tool-call
+  Integrate agent-heart observability into agentic projects and frameworks.
+  agent-heart is a CLI-first observability layer that tracks AI agent tool-call
   lifecycle (lock/beat/unlock), detects stuck runs (stale), and flags silent
   failures (dead). Use this skill whenever the user wants to add observability,
   monitoring, or heartbeat tracking to an agent project, track what an agent is
-  doing through CLIs, integrate agent-pulse with Claude Code hooks or /loop
-  scheduled tasks, connect agent-pulse to frameworks like OpenClaw, LangChain,
+  doing through CLIs, integrate agent-heart with Claude Code hooks or /loop
+  scheduled tasks, connect agent-heart to frameworks like OpenClaw, LangChain,
   LangGraph, CrewAI, OpenAI Agents SDK, or Anthropic Agent SDK, or wrap CLI
   tool calls with lifecycle tracking. Also use when the user mentions
-  agent-pulse, tool-call observability, stuck-run detection, or wants to
+  agent-heart, tool-call observability, stuck-run detection, or wants to
   monitor agentic CLI execution.
 ---
 
-# agent-pulse Integration
+# agent-heart Integration
 
-agent-pulse provides CLI-first observability for AI agent tool calls. It tracks
+agent-heart provides CLI-first observability for AI agent tool calls. It tracks
 the full lifecycle of every tool invocation — start, progress, completion,
 failure, or disappearance — through a simple lock/beat/unlock model.
 
@@ -34,13 +34,13 @@ failure, or disappearance — through a simple lock/beat/unlock model.
 - Command families group related CLIs: `gh` → `github`, `kubectl` → `kubernetes`
 
 **Three integration surfaces:**
-1. **CLI exec wrapper** — wrap any command with `agent-pulse exec`
+1. **CLI exec wrapper** — wrap any command with `agent-heart exec`
 2. **Hook handlers** — automatic tracking via Claude Code or OpenClaw hooks
 3. **SDK client** — programmatic `PulseClient` for custom integrations
 
 ## Setup (Required First Step)
 
-Before any integration, agent-pulse needs to be installed and its server running.
+Before any integration, agent-heart needs to be installed and its server running.
 
 ```bash
 npx agent-heart init
@@ -48,7 +48,7 @@ npx agent-heart server start
 ```
 
 The server runs on `127.0.0.1:7778` by default (SQLite-backed, single process).
-Config lives at `~/.agent-pulse/config.json`.
+Config lives at `~/.agent-heart/config.json`.
 
 ## Choose Your Integration Approach
 
@@ -62,7 +62,7 @@ Pick the approach that matches the user's framework and needs:
 | **CrewAI** | Tool wrapper | `references/framework-integrations.md` |
 | **OpenAI Agents SDK** | Function tool wrapper | `references/framework-integrations.md` |
 | **Anthropic Agent SDK** | Tool callback | `references/framework-integrations.md` |
-| **Any CLI tool** | `agent-pulse exec` wrapper | See below |
+| **Any CLI tool** | `agent-heart exec` wrapper | See below |
 | **Custom / other** | PulseClient SDK | `references/framework-integrations.md` |
 
 Read the appropriate reference file for detailed instructions specific to each
@@ -102,7 +102,7 @@ This automatically:
 - `--session <id>` — session ID for correlation
 - `--heartbeat-interval <ms>` — beat frequency (default: 15000)
 - `--metadata <json>` — extra metadata as JSON string
-- `-q, --quiet` — suppress agent-pulse output
+- `-q, --quiet` — suppress agent-heart output
 - `--json` (parent flag) — machine-readable JSON output
 
 ## Programmatic SDK Usage (TypeScript/Node.js)
@@ -170,7 +170,7 @@ npx agent-heart overview --json
 
 ## Monitor Configuration
 
-Tune stale/dead detection per service in `~/.agent-pulse/config.json`:
+Tune stale/dead detection per service in `~/.agent-heart/config.json`:
 
 ```json
 {
@@ -196,7 +196,7 @@ Tune stale/dead detection per service in `~/.agent-pulse/config.json`:
 
 ## Redaction
 
-agent-pulse redacts sensitive values from commands by default. Patterns matched:
+agent-heart redacts sensitive values from commands by default. Patterns matched:
 `password`, `secret`, `token`, `key`, `auth`, `credential`, `api_key`, `apikey`.
 
 Customize in config:
@@ -212,7 +212,7 @@ Customize in config:
 
 ## Generic Hook Interface
 
-For any framework with a hook/plugin system, agent-pulse provides a generic
+For any framework with a hook/plugin system, agent-heart provides a generic
 CLI hook that accepts flags instead of stdin JSON:
 
 ```bash
@@ -248,4 +248,4 @@ configured thresholds. Check `npx agent-heart runs --status locked`.
 
 **Redaction too aggressive:** Adjust `redact.patterns` in your config.
 
-**Port conflict:** Change `server.port` in `~/.agent-pulse/config.json`.
+**Port conflict:** Change `server.port` in `~/.agent-heart/config.json`.

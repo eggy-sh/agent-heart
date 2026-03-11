@@ -38,13 +38,13 @@ This layer needs to answer:
 - What resource was it operating on?
 - How long did it take?
 
-`agent-pulse` is built for exactly this.
+`agent-heart` is built for exactly this.
 
 ## Why Stale/Dead Matters More Than Up/Down
 
 Traditional monitoring uses a binary model: a service is either up or down. That works for long-running servers. It does not work for agent-driven tool calls, which are short-lived, numerous, and have expected durations.
 
-`agent-pulse` uses a lifecycle model with two failure modes that matter far more for agent work:
+`agent-heart` uses a lifecycle model with two failure modes that matter far more for agent work:
 
 **Stale** -- a run has been locked (started) longer than its expected cycle time. The tool call might be hanging, the agent might be stuck in a retry loop, or the underlying service might be throttling. The run is not dead -- it is still technically active -- but it is not progressing as expected.
 
@@ -59,7 +59,7 @@ This distinction is critical for agents because:
 
 ## Comparison with Existing Tools
 
-| Capability | agent-pulse | Healthchecks | Uptime Kuma | Blackbox Exporter |
+| Capability | agent-heart | Healthchecks | Uptime Kuma | Blackbox Exporter |
 |---|---|---|---|---|
 | **Dead-man-switch heartbeat** | Yes | Yes | No | No |
 | **Lock/unlock lifecycle tracking** | Yes | No | No | No |
@@ -96,4 +96,4 @@ Most tools in this space focus on one of two things:
 
 Very few sit in the middle and answer: what was the agent doing, which CLI was involved, did it finish, did it get stuck, did it disappear mid-task?
 
-That middle layer is where `agent-pulse` lives. It is the observability plane for CLI-driven agent work.
+That middle layer is where `agent-heart` lives. It is the observability plane for CLI-driven agent work.

@@ -11,7 +11,7 @@ import { log, chrome } from "../../utils/logger.js";
 
 export function makeInitCommand(): Command {
   const init = new Command("init")
-    .description("Initialize agent-pulse configuration")
+    .description("Initialize agent-heart configuration")
     .option("-f, --force", "Overwrite existing configuration")
     .action(async (opts) => {
       const parentOpts = init.parent?.opts() ?? {};

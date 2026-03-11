@@ -1,5 +1,5 @@
 {
-  "skill_name": "agent-pulse",
+  "skill_name": "agent-heart",
   "iteration": 1,
   "timestamp": "2026-03-07T00:00:00Z",
   "summary": {
@@ -86,8 +86,8 @@
   "analysis": {
     "key_findings": [
       "With-skill achieves 100% pass rate across all 15 assertions vs 67% without skill",
-      "The skill's biggest value is correctness of framework-specific config: exact file names (.claude/settings.json not hooks.json), exact CLI syntax (npx agent-pulse hook claude-code --event), and exact config format (OpenClaw config.json structure)",
-      "Without the skill, the model invents plausible but incorrect commands (agent-pulse hook lock, agent-pulse exec --lock --stdin) and wrong config file names",
+      "The skill's biggest value is correctness of framework-specific config: exact file names (.claude/settings.json not hooks.json), exact CLI syntax (npx agent-heart hook claude-code --event), and exact config format (OpenClaw config.json structure)",
+      "Without the skill, the model invents plausible but incorrect commands (agent-heart hook lock, agent-heart exec --lock --stdin) and wrong config file names",
       "LangChain was the closest baseline (4/5) since the callback pattern is more generic; Claude Code and OpenClaw baselines were weaker (3/5) because they require precise config knowledge"
     ],
     "tradeoffs": "With-skill runs use ~2x tokens and ~50% more time due to reading reference files, but the accuracy improvement is substantial for framework-specific integration guidance"

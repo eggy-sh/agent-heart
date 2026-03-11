@@ -10,7 +10,7 @@
     {
       "text": "includes_hook_commands",
       "passed": false,
-      "evidence": "Uses invented commands like 'agent-pulse hook lock', 'agent-pulse hook beat', 'agent-pulse hook unlock' instead of the actual 'npx agent-pulse hook claude-code --event pre-tool-use' syntax."
+      "evidence": "Uses invented commands like 'agent-heart hook lock', 'agent-heart hook beat', 'agent-heart hook unlock' instead of the actual 'npx agent-heart hook claude-code --event pre-tool-use' syntax."
     },
     {
       "text": "includes_loop_command",
@@ -20,7 +20,7 @@
     {
       "text": "includes_setup_steps",
       "passed": true,
-      "evidence": "Has 'npm install -g agent-pulse' for installation"
+      "evidence": "Has 'npm install -g agent-heart' for installation"
     },
     {
       "text": "covers_session_tracking",

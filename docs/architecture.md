@@ -2,7 +2,7 @@
 
 ## Core Lifecycle Model
 
-Every tracked execution in `agent-pulse` is a **Run**. Runs follow a deterministic lifecycle:
+Every tracked execution in `agent-heart` is a **Run**. Runs follow a deterministic lifecycle:
 
 ```
   lock        beat (periodic)       unlock
@@ -42,7 +42,7 @@ Every tracked execution in `agent-pulse` is a **Run**. Runs follow a determinist
 - **`expected_cycle_ms`** -- how long a run is expected to take from lock to unlock. If exceeded, the run is marked `stale`. Default: 5 minutes.
 - **`max_silence_ms`** -- how long since the last heartbeat before a run is marked `dead`. Default: 10 minutes.
 
-Both can be configured per-service in `~/.agent-pulse/config.json`.
+Both can be configured per-service in `~/.agent-heart/config.json`.
 
 ## System Components
 
@@ -56,11 +56,11 @@ flowchart TB
     end
 
     subgraph CLI
-        exec[agent-pulse exec]
-        lock_cmd[agent-pulse lock]
-        beat_cmd[agent-pulse beat]
-        unlock_cmd[agent-pulse unlock]
-        status_cmd[agent-pulse status]
+        exec[agent-heart exec]
+        lock_cmd[agent-heart lock]
+        beat_cmd[agent-heart beat]
+        unlock_cmd[agent-heart unlock]
+        status_cmd[agent-heart status]
     end
 
     subgraph Server
@@ -89,7 +89,7 @@ flowchart TB
     monitor -->|stale/dead detection| db
 ```
 
-### CLI (`agent-pulse`)
+### CLI (`agent-heart`)
 
 The command-line binary. Used directly by humans, called by agents, or invoked from hook scripts. Communicates with the server over HTTP.
 
@@ -130,7 +130,7 @@ Runs on a configurable interval (default: 30 seconds).
 
 ### Database (SQLite)
 
-Single-file SQLite database at `~/.agent-pulse/pulse.db`. Stores:
+Single-file SQLite database at `~/.agent-heart/pulse.db`. Stores:
 - `runs` -- all tracked executions with full metadata
 - `services` -- service-level configuration and aggregate state
 
@@ -140,7 +140,7 @@ No migrations framework yet -- schema is created on first server start.
 
 ### Run (First-Class Object)
 
-The **Run** is the primary object in `agent-pulse`. Every `lock` creates a new run. Every `beat` updates it. Every `unlock` closes it.
+The **Run** is the primary object in `agent-heart`. Every `lock` creates a new run. Every `beat` updates it. Every `unlock` closes it.
 
 ```typescript
 interface Run {
@@ -229,11 +229,11 @@ The `exec` command is the highest-leverage feature. Here is the full flow:
 ```mermaid
 sequenceDiagram
     participant User as Agent / Human
-    participant CLI as agent-pulse exec
+    participant CLI as agent-heart exec
     participant Cmd as Wrapped Command
     participant API as Pulse Server
 
-    User->>CLI: agent-pulse exec -- gh pr list
+    User->>CLI: agent-heart exec -- gh pr list
     CLI->>API: POST /heartbeat (lock)
     API-->>CLI: run_id
     CLI->>Cmd: spawn "gh pr list"

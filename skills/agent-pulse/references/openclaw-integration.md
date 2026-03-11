@@ -21,7 +21,7 @@ Add to OpenClaw config (`~/.openclaw/config.json` or `.openclaw/config.json`):
 ```json
 {
   "plugins": {
-    "agent-pulse": {
+    "agent-heart": {
       "hooks": {
         "before_tool_call": "npx agent-heart hook openclaw",
         "after_tool_call": "npx agent-heart hook openclaw"
@@ -31,7 +31,7 @@ Add to OpenClaw config (`~/.openclaw/config.json` or `.openclaw/config.json`):
 }
 ```
 
-OpenClaw pipes event JSON to agent-pulse on every tool call.
+OpenClaw pipes event JSON to agent-heart on every tool call.
 
 ### How It Works
 
@@ -65,7 +65,7 @@ using the tool type as the service name (e.g., `openclaw/browser`).
 
 ### GWS (Google Workspace) Deep Parsing
 
-When the agent runs Google Workspace CLI commands, agent-pulse parses the
+When the agent runs Google Workspace CLI commands, agent-heart parses the
 command structure `gws <service> <resource> <method>` for rich metadata:
 
 ```bash
@@ -83,32 +83,32 @@ error types (auth, quota, not_found, server), and response item counts.
 
 ## Approach 2: Skill-Based (Agent-Driven)
 
-Teach the OpenClaw agent to wrap important commands with `agent-pulse exec`.
+Teach the OpenClaw agent to wrap important commands with `agent-heart exec`.
 The agent decides when tracking matters. Best for enriched metadata on
 high-value operations.
 
 ### Setup
 
 Create a skill file at
-`~/.openclaw/skills/agent-pulse-observability/SKILL.md`:
+`~/.openclaw/skills/agent-heart-observability/SKILL.md`:
 
 ```markdown
 ---
-name: agent-pulse-observability
+name: agent-heart-observability
 description: >
-  Wrap important CLI commands with agent-pulse observability. Use when
+  Wrap important CLI commands with agent-heart observability. Use when
   executing commands that interact with external services (GitHub, GWS,
   Kubernetes, databases, APIs). Skip for trivial local commands (echo,
   cat, ls, pwd).
 requires:
   bins:
-    - agent-pulse
+    - agent-heart
 ---
 
 # Agent Pulse Observability
 
 When executing CLI commands that interact with external services, wrap them
-with agent-pulse for lifecycle tracking.
+with agent-heart for lifecycle tracking.
 
 ## When to Wrap
 
@@ -159,7 +159,7 @@ npx agent-heart exec --service openclaw/database --tool psql --resource query \
 With the skill loaded, the agent wraps important commands automatically:
 
 ```bash
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/github \
   --tool gh \
   --resource pulls \
@@ -219,9 +219,9 @@ m4p7q2...    gh       actions   completed  2.1s       0
 echo '{"event":"before_tool_call","tool":"exec","params":{"command":"echo hello"},"session":{"id":"test"}}' | npx agent-heart hook openclaw
 ```
 
-**Skill not loading:** Verify location and that `agent-pulse` is available:
+**Skill not loading:** Verify location and that `agent-heart` is available:
 ```bash
-ls ~/.openclaw/skills/agent-pulse-observability/SKILL.md
+ls ~/.openclaw/skills/agent-heart-observability/SKILL.md
 npx agent-heart --version
 ```
 

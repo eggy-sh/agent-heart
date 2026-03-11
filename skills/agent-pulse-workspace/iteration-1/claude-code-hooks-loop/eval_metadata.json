@@ -1,7 +1,7 @@
 {
   "eval_id": 1,
   "eval_name": "claude-code-hooks-loop",
-  "prompt": "Set up agent-pulse hooks in my Claude Code project so I can see what tools the agent is using, and also set up a /loop to alert me if anything goes stale",
+  "prompt": "Set up agent-heart hooks in my Claude Code project so I can see what tools the agent is using, and also set up a /loop to alert me if anything goes stale",
   "assertions": [
     {
       "name": "includes_hooks_config",
@@ -11,9 +11,9 @@
     },
     {
       "name": "includes_hook_commands",
-      "description": "Provides the agent-pulse hook claude-code commands",
+      "description": "Provides the agent-heart hook claude-code commands",
       "type": "contains_any",
-      "values": ["agent-pulse hook claude-code", "npx agent-pulse hook"]
+      "values": ["agent-heart hook claude-code", "npx agent-heart hook"]
     },
     {
       "name": "includes_loop_command",
@@ -23,7 +23,7 @@
     },
     {
       "name": "includes_setup_steps",
-      "description": "Mentions installing and starting agent-pulse",
+      "description": "Mentions installing and starting agent-heart",
       "type": "contains_any",
       "values": ["npm install", "server start"]
     },

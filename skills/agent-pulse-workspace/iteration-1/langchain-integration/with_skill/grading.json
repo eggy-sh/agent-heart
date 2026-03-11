@@ -5,7 +5,7 @@
     {
       "text": "includes_setup_steps",
       "passed": true,
-      "evidence": "Contains 'npm install -g agent-pulse', 'agent-pulse init', and 'agent-pulse server start' in Step 1"
+      "evidence": "Contains 'npm install -g agent-heart', 'agent-heart init', and 'agent-heart server start' in Step 1"
     },
     {
       "text": "provides_callback_handler",
@@ -20,7 +20,7 @@
     {
       "text": "mentions_stale_detection",
       "passed": true,
-      "evidence": "Explains 'stale (stuck longer than expected) or dead (no heartbeat at all)' and links to agent-pulse runs --status stale"
+      "evidence": "Explains 'stale (stuck longer than expected) or dead (no heartbeat at all)' and links to agent-heart runs --status stale"
     },
     {
       "text": "includes_usage_example",

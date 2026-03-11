@@ -10,7 +10,7 @@
     {
       "text": "includes_config_json",
       "passed": true,
-      "evidence": "Provides exact config.json with 'npx agent-pulse hook openclaw' for both hooks"
+      "evidence": "Provides exact config.json with 'npx agent-heart hook openclaw' for both hooks"
     },
     {
       "text": "explains_command_family_mapping",
@@ -20,7 +20,7 @@
     {
       "text": "includes_setup_steps",
       "passed": true,
-      "evidence": "Step 1 has npm install, agent-pulse init, and agent-pulse server start"
+      "evidence": "Step 1 has npm install, agent-heart init, and agent-heart server start"
     },
     {
       "text": "mentions_automatic_tracking",

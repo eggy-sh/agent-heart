@@ -58,7 +58,7 @@ export function makeStatusCommand(): Command {
 
         chrome.blank();
         chrome.log(
-          chalk.bold.cyan("  agent-pulse status"),
+          chalk.bold.cyan("  agent-heart status"),
         );
         chrome.log(
           chalk.dim(`  ${overview.timestamp}`),

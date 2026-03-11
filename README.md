@@ -1,17 +1,17 @@
-# agent-pulse
+# agent-heart
 
 **Know what your agent started, what it finished, and what got stuck.**
 
 <!-- Badges -->
-<!-- [![npm version](https://img.shields.io/npm/v/agent-pulse.svg)](https://www.npmjs.com/package/agent-pulse) -->
-<!-- [![license](https://img.shields.io/npm/l/agent-pulse.svg)](./LICENSE) -->
-<!-- [![CI](https://github.com/YOUR_ORG/agent-pulse/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_ORG/agent-pulse/actions) -->
+<!-- [![npm version](https://img.shields.io/npm/v/agent-heart.svg)](https://www.npmjs.com/package/agent-heart) -->
+<!-- [![license](https://img.shields.io/npm/l/agent-heart.svg)](./LICENSE) -->
+<!-- [![CI](https://github.com/YOUR_ORG/agent-heart/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_ORG/agent-heart/actions) -->
 
 Agents are starting to do real operator work. They run `gh`, `kubectl`, `gws`, `terraform`, `psql`, and whatever internal CLI your team quietly depends on.
 
 That sounds great right up until you need to answer the most basic question: what is the agent doing right now?
 
-`agent-pulse` is a CLI-first observability layer for that exact gap. It tracks the lifecycle of tool calls, tells you when a run is still alive, flags runs that went stale, and makes silent failures visible before they turn into mystery.
+`agent-heart` is a CLI-first observability layer for that exact gap. It tracks the lifecycle of tool calls, tells you when a run is still alive, flags runs that went stale, and makes silent failures visible before they turn into mystery.
 
 ---
 
@@ -32,7 +32,7 @@ That middle is where trust breaks. The agent looked busy. Then it stopped talkin
 
 Traditional monitoring still matters. But it answers a different question. [Healthchecks](https://github.com/healthchecks/healthchecks) handles dead-man-switch heartbeats. [Uptime Kuma](https://github.com/louislam/uptime-kuma) handles endpoint uptime. [Blackbox Exporter](https://github.com/prometheus/blackbox_exporter) handles probing. None of them model the lifecycle of an agent executing real work through CLIs.
 
-That is the gap `agent-pulse` is built to fill.
+That is the gap `agent-heart` is built to fill.
 
 ## What It Does
 
@@ -124,7 +124,7 @@ npx agent-heart status --json                # pipe to jq
 ### `server start` / `init`
 
 ```bash
-npx agent-heart init           # create ~/.agent-pulse/config.json
+npx agent-heart init           # create ~/.agent-heart/config.json
 npx agent-heart server start   # start the local server on :7778
 ```
 
@@ -158,7 +158,7 @@ console.log(overview.runs.stale); // stuck runs count
 
 ## Claude Code Hooks
 
-`agent-pulse` integrates with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) hooks to automatically track every tool call in an agent session.
+`agent-heart` integrates with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) hooks to automatically track every tool call in an agent session.
 
 Add to your `.claude/settings.json`:
 
@@ -197,7 +197,7 @@ See [docs/hooks/claude-code.md](./docs/hooks/claude-code.md) for the full integr
 
 ### Continuous Monitoring with `/loop`
 
-Claude Code's [`/loop`](https://code.claude.com/docs/en/scheduled-tasks) runs a prompt on a recurring interval inside your session. Pair it with agent-pulse and the agent monitors its own work in real time.
+Claude Code's [`/loop`](https://code.claude.com/docs/en/scheduled-tasks) runs a prompt on a recurring interval inside your session. Pair it with agent-heart and the agent monitors its own work in real time.
 
 ```
 # Watch for stuck runs every 3 minutes
@@ -220,7 +220,7 @@ Hooks record what the agent does. `/loop` watches whether it's going well. See [
 Agent / Human
       |
       v
-  CLI Wrapper (agent-pulse exec)
+  CLI Wrapper (agent-heart exec)
       |
       |  lock -> beat -> unlock
       v
@@ -236,7 +236,7 @@ Agent / Human
 **Core lifecycle model**: Every tracked execution is a **Run**. Runs transition through states: `locked` -> `active` -> `completed` (or `failed`). If heartbeats stop, the monitor marks them `stale` then `dead`.
 
 **Components**:
-- **CLI** -- the `agent-pulse` binary, used by humans and agents alike
+- **CLI** -- the `agent-heart` binary, used by humans and agents alike
 - **Client SDK** -- TypeScript library for programmatic integration
 - **Server** -- lightweight HTTP API backed by SQLite
 - **Monitor** -- background loop that detects stale and dead runs
@@ -245,7 +245,7 @@ See [docs/architecture.md](./docs/architecture.md) for the full breakdown.
 
 ## Configuration
 
-Configuration lives at `~/.agent-pulse/config.json`:
+Configuration lives at `~/.agent-heart/config.json`:
 
 ```json
 {
@@ -266,7 +266,7 @@ Configuration lives at `~/.agent-pulse/config.json`:
     }
   ],
   "database": {
-    "path": "~/.agent-pulse/pulse.db"
+    "path": "~/.agent-heart/pulse.db"
   },
   "redact": {
     "enabled": true,
@@ -284,11 +284,11 @@ Key settings:
 
 ### Isn't this just Healthchecks for agent runs?
 
-Not really. Healthchecks is great at "did something ping on time?" `agent-pulse` tracks a run as a run: started, still alive, completed, stale, or dead, with tool and resource metadata attached.
+Not really. Healthchecks is great at "did something ping on time?" `agent-heart` tracks a run as a run: started, still alive, completed, stale, or dead, with tool and resource metadata attached.
 
 ### Why not use OpenTelemetry?
 
-You probably still should if your system already speaks OpenTelemetry. But most agent workflows fall apart at the CLI boundary. `agent-pulse` starts there on purpose.
+You probably still should if your system already speaks OpenTelemetry. But most agent workflows fall apart at the CLI boundary. `agent-heart` starts there on purpose.
 
 ### Why a local server and SQLite?
 
@@ -312,8 +312,8 @@ Contributions are welcome.
 
 ```bash
 # Clone and install
-git clone https://github.com/eggy-sh/agent-pulse.git
-cd agent-pulse
+git clone https://github.com/eggy-sh/agent-heart.git
+cd agent-heart
 npm install
 
 # Build

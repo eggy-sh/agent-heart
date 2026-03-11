@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import type { PulseConfig } from "./models.js";
 
-const CONFIG_DIR = join(homedir(), ".agent-pulse");
+const CONFIG_DIR = join(homedir(), ".agent-heart");
 const CONFIG_FILE = "config.json";
 const DB_FILE = "pulse.db";
 

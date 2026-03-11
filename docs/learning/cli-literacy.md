@@ -120,7 +120,7 @@ echo $?
 # 0 = yes, anything else = no
 ```
 
-This is the reason `agent-pulse` separates its own messages (stderr) from its data output (stdout). Human-readable status goes one way. Machine-readable data goes another. Both matter. They just serve different readers.
+This is the reason `agent-heart` separates its own messages (stderr) from its data output (stdout). Human-readable status goes one way. Machine-readable data goes another. Both matter. They just serve different readers.
 
 ---
 
@@ -142,7 +142,7 @@ This is composability. And it's the reason CLIs outlasted every GUI trend for fi
 npx agent-heart status --json | jq '[.[] | select(.status == "stale")] | length'
 ```
 
-That's agent-pulse's status piped into `jq` to count stale runs. One line. No dashboard needed.
+That's agent-heart's status piped into `jq` to count stale runs. One line. No dashboard needed.
 
 ---
 
@@ -224,7 +224,7 @@ docker build -t acme/api:v2.3.1 .
 npx agent-heart runs --service github --status failed --json | jq '.[].message'
 ```
 
-> "Show me agent-pulse runs for the github service that failed, in JSON format, then extract just the message field from each one."
+> "Show me agent-heart runs for the github service that failed, in JSON format, then extract just the message field from each one."
 
 If you got the gist of those -- even roughly -- you're CLI-literate. The rest is vocabulary, and vocabulary comes with exposure.
 
@@ -271,5 +271,5 @@ Find a working command. Change one thing. Run it. See what happens. That's the l
 ## What to Read Next
 
 - [CLIs and Agents](./clis-and-agents.md) -- Why CLIs are the interface layer for AI agents, and how to build them for your own workflows.
-- [Scenarios](../scenarios.md) -- Real agent-pulse workflows that put these concepts into practice.
-- [Architecture](../architecture.md) -- How agent-pulse itself is built, if you want to see the internals.
+- [Scenarios](../scenarios.md) -- Real agent-heart workflows that put these concepts into practice.
+- [Architecture](../architecture.md) -- How agent-heart itself is built, if you want to see the internals.

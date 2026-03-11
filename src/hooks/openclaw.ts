@@ -2,7 +2,7 @@
  * OpenClaw Plugin Hook Handler
  *
  * Maps OpenClaw plugin hook events (before_tool_call, after_tool_call)
- * to agent-pulse lifecycle events (lock, unlock).
+ * to agent-heart lifecycle events (lock, unlock).
  *
  * OpenClaw sends structured JSON events to plugin hooks via stdin.
  * The exec tool is the primary target for tracking, but other tool
@@ -336,7 +336,7 @@ export function resetClient(): void {
 
 /**
  * Handle before_tool_call for exec tools.
- * Sends a `lock` to agent-pulse with command metadata.
+ * Sends a `lock` to agent-heart with command metadata.
  */
 export async function handleBeforeToolCall(
   data: OpenClawHookEvent,
@@ -380,7 +380,7 @@ export async function handleBeforeToolCall(
 
 /**
  * Handle after_tool_call for exec tools.
- * Sends an `unlock` to agent-pulse with exit code and duration.
+ * Sends an `unlock` to agent-heart with exit code and duration.
  */
 export async function handleAfterToolCall(
   data: OpenClawHookEvent,
@@ -467,11 +467,11 @@ export async function handleOpenClawEvent(
       // Unknown or unsupported event type -- ignore gracefully
       if (event) {
         console.error(
-          `[agent-pulse] Ignoring unknown OpenClaw event: ${event}`,
+          `[agent-heart] Ignoring unknown OpenClaw event: ${event}`,
         );
       } else {
         console.error(
-          "[agent-pulse] Received OpenClaw event with no 'event' field",
+          "[agent-heart] Received OpenClaw event with no 'event' field",
         );
       }
       break;
@@ -516,7 +516,7 @@ export async function readStdinAndHandle(): Promise<void> {
     data = JSON.parse(raw || "{}") as OpenClawHookEvent;
   } catch {
     // If stdin is not valid JSON, use empty object
-    console.error("[agent-pulse] Failed to parse OpenClaw hook event JSON");
+    console.error("[agent-heart] Failed to parse OpenClaw hook event JSON");
     data = {};
   }
 

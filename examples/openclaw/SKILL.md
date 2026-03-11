@@ -1,10 +1,10 @@
 ---
-name: agent-pulse-observability
-description: Track CLI tool execution with agent-pulse lifecycle monitoring
+name: agent-heart-observability
+description: Track CLI tool execution with agent-heart lifecycle monitoring
 version: 1.0.0
 requires:
   bins:
-    - agent-pulse
+    - agent-heart
 tags:
   - observability
   - monitoring
@@ -13,11 +13,11 @@ tags:
 
 # Agent Pulse Observability
 
-Use `agent-pulse exec` to wrap important CLI operations so that every tool call is tracked with lifecycle monitoring (started, running, completed, or failed). This gives you visibility into what is executing, what finished, and what got stuck.
+Use `agent-heart exec` to wrap important CLI operations so that every tool call is tracked with lifecycle monitoring (started, running, completed, or failed). This gives you visibility into what is executing, what finished, and what got stuck.
 
 ## When to Use
 
-Wrap a command with `agent-pulse exec` when:
+Wrap a command with `agent-heart exec` when:
 
 - The command makes a **network request** or calls an **external API** (gh, curl, gws, kubectl)
 - The command **modifies state** (creating PRs, deploying, writing to cloud resources)
@@ -39,7 +39,7 @@ If the command completes in under a second and has no external side effects, run
 ## Syntax
 
 ```bash
-agent-pulse exec \
+agent-heart exec \
   --service <service> \
   --tool <tool_name> \
   --resource <resource_kind> \
@@ -60,21 +60,21 @@ agent-pulse exec \
 
 ```bash
 # List pull requests
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/github \
   --tool gh \
   --resource pulls \
   -- gh pr list --repo myorg/myrepo
 
 # Create an issue
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/github \
   --tool gh \
   --resource issues \
   -- gh issue create --title "Bug: login broken" --body "Steps to reproduce..."
 
 # Check workflow runs
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/github \
   --tool gh \
   --resource actions \
@@ -85,21 +85,21 @@ agent-pulse exec \
 
 ```bash
 # List drive files
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/google-workspace \
   --tool gws \
   --resource drive \
   -- gws drive files list --query "name contains 'report'"
 
 # Send an email
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/google-workspace \
   --tool gws \
   --resource gmail \
   -- gws gmail messages send --to user@example.com --subject "Update" --body "..."
 
 # List calendar events
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/google-workspace \
   --tool gws \
   --resource calendar \
@@ -110,21 +110,21 @@ agent-pulse exec \
 
 ```bash
 # Get pods
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/kubernetes \
   --tool kubectl \
   --resource pods \
   -- kubectl get pods -n production
 
 # Apply a manifest
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/kubernetes \
   --tool kubectl \
   --resource deployments \
   -- kubectl apply -f deployment.yaml
 
 # View logs
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/kubernetes \
   --tool kubectl \
   --resource logs \
@@ -135,14 +135,14 @@ agent-pulse exec \
 
 ```bash
 # GET request to an API
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/http \
   --tool curl \
   --resource api \
   -- curl -s https://api.example.com/v1/status
 
 # POST request
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/http \
   --tool curl \
   --resource api \
@@ -153,14 +153,14 @@ agent-pulse exec \
 
 ```bash
 # List running containers
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/docker \
   --tool docker \
   --resource containers \
   -- docker ps
 
 # Build an image
-agent-pulse exec \
+agent-heart exec \
   --service openclaw/docker \
   --tool docker \
   --resource images \
@@ -169,16 +169,16 @@ agent-pulse exec \
 
 ## What Happens
 
-When you wrap a command with `agent-pulse exec`:
+When you wrap a command with `agent-heart exec`:
 
-1. A `lock` is sent to the agent-pulse server (marks the run as started)
+1. A `lock` is sent to the agent-heart server (marks the run as started)
 2. Periodic `beat` heartbeats are sent while the command runs
 3. An `unlock` is sent when the command completes, with the exit code and duration
 
-If the command hangs or the process dies, the agent-pulse server detects the missing heartbeats and marks the run as `stale` then `dead`.
+If the command hangs or the process dies, the agent-heart server detects the missing heartbeats and marks the run as `stale` then `dead`.
 
 You can check on all tracked operations by running:
 
 ```bash
-agent-pulse status
+agent-heart status
 ```

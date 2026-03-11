@@ -2,7 +2,7 @@
  * Claude Code Hook Handler
  *
  * Maps Claude Code lifecycle events (SessionStart, PreToolUse, PostToolUse, SessionEnd)
- * to agent-pulse lifecycle events (lock, beat, unlock).
+ * to agent-heart lifecycle events (lock, beat, unlock).
  *
  * Usage from a Claude Code hook:
  *   echo '$TOOL_INPUT' | npx agent-heart hook claude-code --event pre-tool-use

@@ -1,15 +1,15 @@
 {
-  "skill_name": "agent-pulse",
+  "skill_name": "agent-heart",
   "evals": [
     {
       "id": 0,
-      "prompt": "I have a LangChain agent that calls several tools. I want to track which tool calls are getting stuck. How do I add agent-pulse?",
-      "expected_output": "Provides a LangChain callback handler that integrates with agent-pulse, with setup instructions and usage example",
+      "prompt": "I have a LangChain agent that calls several tools. I want to track which tool calls are getting stuck. How do I add agent-heart?",
+      "expected_output": "Provides a LangChain callback handler that integrates with agent-heart, with setup instructions and usage example",
       "files": []
     },
     {
       "id": 1,
-      "prompt": "Set up agent-pulse hooks in my Claude Code project so I can see what tools the agent is using, and also set up a /loop to alert me if anything goes stale",
+      "prompt": "Set up agent-heart hooks in my Claude Code project so I can see what tools the agent is using, and also set up a /loop to alert me if anything goes stale",
       "expected_output": "Provides Claude Code hooks config for .claude/settings.json and /loop examples for monitoring stale runs",
       "files": []
     },

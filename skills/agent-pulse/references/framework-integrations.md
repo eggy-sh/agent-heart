@@ -1,20 +1,20 @@
 # Framework Integrations
 
-This reference covers integrating agent-pulse with popular agentic frameworks
+This reference covers integrating agent-heart with popular agentic frameworks
 that don't have built-in hook support. The pattern is the same across all of
-them: wrap tool execution with agent-pulse lifecycle events.
+them: wrap tool execution with agent-heart lifecycle events.
 
 ---
 
 ## LangChain / LangGraph
 
 LangChain's callback system is the natural integration point. Create a custom
-callback handler that sends lifecycle events to agent-pulse.
+callback handler that sends lifecycle events to agent-heart.
 
 ### Callback Handler
 
 ```python
-"""agent_pulse_callback.py — LangChain callback handler for agent-pulse."""
+"""agent_pulse_callback.py — LangChain callback handler for agent-heart."""
 
 import subprocess
 import json
@@ -26,7 +26,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 
 
 class AgentPulseCallbackHandler(BaseCallbackHandler):
-    """Track LangChain tool calls via agent-pulse lifecycle events."""
+    """Track LangChain tool calls via agent-heart lifecycle events."""
 
     def __init__(self, service_prefix: str = "langchain", session_id: Optional[str] = None):
         self.service_prefix = service_prefix
@@ -34,10 +34,10 @@ class AgentPulseCallbackHandler(BaseCallbackHandler):
         self._active_runs: Dict[str, str] = {}  # run_id -> service_name
 
     def _pulse_cmd(self, args: List[str]) -> None:
-        """Fire-and-forget agent-pulse CLI call."""
+        """Fire-and-forget agent-heart CLI call."""
         try:
             subprocess.run(
-                ["npx", "agent-pulse", "hook", "generic"] + args,
+                ["npx", "agent-heart", "hook", "generic"] + args,
                 capture_output=True,
                 timeout=5,
             )
@@ -194,12 +194,12 @@ result = app.invoke(initial_state, config={"callbacks": [pulse]})
 
 ## CrewAI
 
-CrewAI tools have a `_run` method. Wrap it with agent-pulse tracking.
+CrewAI tools have a `_run` method. Wrap it with agent-heart tracking.
 
 ### Tool Wrapper
 
 ```python
-"""agent_pulse_crewai.py — CrewAI tool wrapper with agent-pulse tracking."""
+"""agent_pulse_crewai.py — CrewAI tool wrapper with agent-heart tracking."""
 
 import subprocess
 import functools
@@ -207,7 +207,7 @@ from typing import Any
 
 
 def tracked_tool(service_prefix: str = "crewai", session_id: str = "crewai-session"):
-    """Decorator that wraps a CrewAI tool's _run with agent-pulse tracking."""
+    """Decorator that wraps a CrewAI tool's _run with agent-heart tracking."""
 
     def decorator(tool_class):
         original_run = tool_class._run
@@ -220,7 +220,7 @@ def tracked_tool(service_prefix: str = "crewai", session_id: str = "crewai-sessi
             # Lock
             try:
                 subprocess.run(
-                    ["agent-pulse", "hook", "generic",
+                    ["agent-heart", "hook", "generic",
                      "--action", "lock",
                      "--service", service,
                      "--tool", tool_name,
@@ -238,7 +238,7 @@ def tracked_tool(service_prefix: str = "crewai", session_id: str = "crewai-sessi
                 # Unlock success
                 try:
                     subprocess.run(
-                        ["agent-pulse", "hook", "generic",
+                        ["agent-heart", "hook", "generic",
                          "--action", "unlock",
                          "--service", service,
                          "--session", session_id,
@@ -254,7 +254,7 @@ def tracked_tool(service_prefix: str = "crewai", session_id: str = "crewai-sessi
                 # Unlock failure
                 try:
                     subprocess.run(
-                        ["agent-pulse", "hook", "generic",
+                        ["agent-heart", "hook", "generic",
                          "--action", "unlock",
                          "--service", service,
                          "--session", session_id,
@@ -301,12 +301,12 @@ result = crew.kickoff()
 ## OpenAI Agents SDK
 
 The OpenAI Agents SDK uses function tools. Wrap the function execution with
-agent-pulse tracking.
+agent-heart tracking.
 
 ### Function Tool Wrapper
 
 ```python
-"""agent_pulse_openai.py — OpenAI Agents SDK wrapper with agent-pulse."""
+"""agent_pulse_openai.py — OpenAI Agents SDK wrapper with agent-heart."""
 
 import subprocess
 import functools
@@ -318,7 +318,7 @@ def pulse_tracked(
     session_id: str = "openai-session",
     resource_kind: str | None = None,
 ):
-    """Decorator for OpenAI agent function tools with agent-pulse tracking."""
+    """Decorator for OpenAI agent function tools with agent-heart tracking."""
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -364,7 +364,7 @@ def pulse_tracked(
 def _pulse_fire(args: list[str]) -> None:
     try:
         subprocess.run(
-            ["npx", "agent-pulse", "hook", "generic"] + args,
+            ["npx", "agent-heart", "hook", "generic"] + args,
             capture_output=True, timeout=5,
         )
     except Exception:
@@ -402,14 +402,14 @@ wrapper pattern.
 ### Tool Wrapper
 
 ```typescript
-// agent-pulse-anthropic.ts — Anthropic Agent SDK wrapper
+// agent-heart-anthropic.ts — Anthropic Agent SDK wrapper
 
 import { PulseClient } from "agent-heart";
 
 const pulse = new PulseClient({ sessionId: "anthropic-agent-session" });
 
 /**
- * Wrap a tool handler function with agent-pulse tracking.
+ * Wrap a tool handler function with agent-heart tracking.
  */
 export function trackedTool<TInput, TOutput>(
   toolName: string,
@@ -451,7 +451,7 @@ export function trackedTool<TInput, TOutput>(
 ### Usage
 
 ```typescript
-import { trackedTool } from "./agent-pulse-anthropic";
+import { trackedTool } from "./agent-heart-anthropic";
 
 const getWeather = trackedTool(
   "get_weather",
@@ -469,7 +469,7 @@ const getWeather = trackedTool(
 
 ## Generic Shell-Based Integration
 
-For any framework that can shell out, use the `agent-pulse exec` wrapper or
+For any framework that can shell out, use the `agent-heart exec` wrapper or
 the generic hook CLI. This works for Python, Ruby, Go, Rust, or any language.
 
 ### exec wrapper (simplest)
@@ -515,9 +515,9 @@ def run_with_pulse(
     resource: str | None = None,
     session_id: str | None = None,
 ) -> subprocess.CompletedProcess:
-    """Run a command wrapped with agent-pulse observability."""
+    """Run a command wrapped with agent-heart observability."""
     pulse_args = [
-        "npx", "agent-pulse", "exec",
+        "npx", "agent-heart", "exec",
         "--service", service,
     ]
     if tool:

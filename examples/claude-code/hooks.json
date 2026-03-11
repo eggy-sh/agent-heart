@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/schema/hooks.json",
-  "_comment": "Sample Claude Code hook configuration for agent-pulse. Copy the 'hooks' object into your .claude/settings.json.",
+  "_comment": "Sample Claude Code hook configuration for agent-heart. Copy the 'hooks' object into your .claude/settings.json.",
   "hooks": {
     "SessionStart": [
       {

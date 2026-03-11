@@ -44,7 +44,7 @@ function pluralize(count: number, word: string): string {
 
 export function makeOverviewCommand(): Command {
   const overview = new Command("overview")
-    .description("Show a quick summary of the agent-pulse system")
+    .description("Show a quick summary of the agent-heart system")
     .action(async () => {
       const parentOpts = overview.parent?.opts() ?? {};
       const jsonOutput = parentOpts.json === true;
@@ -65,7 +65,7 @@ export function makeOverviewCommand(): Command {
 
         // Header → stderr so piping works cleanly
         chrome.blank();
-        chrome.log(chalk.bold.cyan("  agent-pulse overview"));
+        chrome.log(chalk.bold.cyan("  agent-heart overview"));
         chrome.log(chalk.dim("  " + "\u2501".repeat(22)));
         chrome.blank();
 

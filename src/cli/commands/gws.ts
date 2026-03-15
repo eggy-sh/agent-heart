@@ -127,6 +127,7 @@ Options:
 
       let runId: string | undefined;
       let beatTimer: ReturnType<typeof setInterval> | undefined;
+      let childExitCode: number | undefined;
       const startTime = Date.now();
 
       // Buffers for capturing output (we need stdout for parsing)
@@ -247,6 +248,8 @@ Options:
           });
         });
 
+        childExitCode = exitCode;
+
         // Step 5: Clean up heartbeats
         if (beatTimer) {
           clearInterval(beatTimer);
@@ -355,7 +358,7 @@ Options:
           try {
             await client.unlock(serviceName, {
               run_id: runId,
-              exit_code: 1,
+              exit_code: childExitCode ?? 1,
               message: error instanceof Error ? error.message : String(error),
               metadata: {
                 ...metadata,
@@ -366,6 +369,17 @@ Options:
           } catch {
             // Best effort
           }
+        }
+
+        // If the child completed, preserve its exit code — the error is from
+        // unlock/summary, and agent-heart's failure should not mask it.
+        if (childExitCode !== undefined) {
+          if (!jsonOutput && !quiet) {
+            log.warn(
+              `agent-heart: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+          process.exit(childExitCode);
         }
 
         if (jsonOutput) {

@@ -89,6 +89,7 @@ export function makeStatusCommand(): Command {
               chalk.dim("Active"),
               chalk.dim("Stale"),
               chalk.dim("Dead"),
+              chalk.dim("Failures"),
               chalk.dim("Last Heartbeat"),
             ],
             style: {
@@ -98,6 +99,7 @@ export function makeStatusCommand(): Command {
           });
 
           for (const svc of services) {
+            const failures = svc.consecutive_failures ?? 0;
             servicesTable.push([
               chalk.white(svc.service_name),
               formatStatus(svc.status),
@@ -111,6 +113,9 @@ export function makeStatusCommand(): Command {
               svc.dead_runs > 0
                 ? chalk.red(svc.dead_runs)
                 : chalk.dim("0"),
+              failures > 0
+                ? chalk.red(failures)
+                : chalk.dim("0"),
               svc.last_heartbeat
                 ? timeSince(svc.last_heartbeat)
                 : chalk.dim("never"),
@@ -118,6 +123,19 @@ export function makeStatusCommand(): Command {
           }
 
           console.log(servicesTable.toString());
+
+          const loopingServices = services.filter(
+            (s) => (s.consecutive_failures ?? 0) >= 3,
+          );
+          if (loopingServices.length > 0) {
+            chrome.blank();
+            for (const svc of loopingServices) {
+              log.warn(
+                `${svc.service_name}: ${svc.consecutive_failures} consecutive failures — agent may be stuck in a loop`,
+              );
+            }
+          }
+
           chrome.blank();
         } else {
           log.dim("  No services registered.");

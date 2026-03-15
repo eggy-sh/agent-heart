@@ -19,6 +19,9 @@ export function startMonitor(db: PulseDB, config: PulseConfig): () => void {
     db.upsertService(svc);
   }
 
+  // Track last-seen consecutive failure counts to only log on change
+  const lastFailureCounts = new Map<string, number>();
+
   function check(): void {
     try {
       // Detect and mark stale runs
@@ -39,6 +42,19 @@ export function startMonitor(db: PulseDB, config: PulseConfig): () => void {
             `silent since ${run.last_heartbeat}`,
         );
         db.markDead(run.run_id);
+      }
+
+      // Detect consecutive failure loops
+      const serviceStates = db.getServiceStates();
+      for (const svc of serviceStates) {
+        const failures = svc.consecutive_failures ?? 0;
+        const prev = lastFailureCounts.get(svc.service_name) ?? 0;
+        if (failures >= 3 && failures !== prev) {
+          log.warn(
+            `${svc.service_name}: ${failures} consecutive failures — possible agent loop`,
+          );
+        }
+        lastFailureCounts.set(svc.service_name, failures);
       }
     } catch (err) {
       log.error(

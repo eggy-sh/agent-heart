@@ -5,6 +5,17 @@ import { PulseClient } from "../../core/client.js";
 import { redactCommand } from "../../utils/redact.js";
 import { log, chrome, formatDuration } from "../../utils/logger.js";
 
+const PERMISSION_PATTERNS = [
+  /permission denied/i,
+  /\b403\b/,
+  /\b401\b/,
+  /unauthorized/i,
+  /not authorized/i,
+  /EPERM\b/,
+  /EACCES\b/,
+  /access denied/i,
+];
+
 export function makeExecCommand(): Command {
   const exec = new Command("exec")
     .description(
@@ -20,6 +31,12 @@ export function makeExecCommand(): Command {
       parseInt,
     )
     .option("--metadata <json>", "Additional metadata as JSON string")
+    .option("--capture", "Capture stdout/stderr tail for forensic replay")
+    .option(
+      "--capture-bytes <n>",
+      "Max bytes to capture per stream (default: 4096)",
+      parseInt,
+    )
     .option(
       "-q, --quiet",
       "Suppress pulse output, only show child process output",
@@ -83,8 +100,14 @@ export function makeExecCommand(): Command {
       // pollute the child process output being captured.
       const quiet = opts.quiet === true || !process.stdout.isTTY;
 
+      const captureEnabled = opts.capture === true;
+      const MAX_CAPTURE = opts.captureBytes ?? 4096;
+      let stdoutTail = "";
+      let stderrTail = "";
+
       let runId: string | undefined;
       let beatTimer: ReturnType<typeof setInterval> | undefined;
+      let childExitCode: number | undefined;
       const startTime = Date.now();
 
       // Cleanup function for signals
@@ -107,6 +130,8 @@ export function makeExecCommand(): Command {
               metadata: {
                 duration_ms: String(duration),
                 command: redactedCommand,
+                ...(captureEnabled && stdoutTail ? { stdout_tail: stdoutTail.slice(-MAX_CAPTURE) } : {}),
+                ...(captureEnabled && stderrTail ? { stderr_tail: stderrTail.slice(-MAX_CAPTURE) } : {}),
               },
             });
           } catch {
@@ -164,10 +189,29 @@ export function makeExecCommand(): Command {
         // Step 4: Spawn child process
         const exitCode = await new Promise<number>((resolve, reject) => {
           const child = spawn(childCommand, childCommandArgs, {
-            stdio: ["inherit", "inherit", "inherit"],
+            stdio: captureEnabled
+              ? ["inherit", "pipe", "pipe"]
+              : ["inherit", "inherit", "inherit"],
             shell: false,
             env: process.env,
           });
+
+          if (captureEnabled) {
+            child.stdout!.on("data", (chunk: Buffer) => {
+              process.stdout.write(chunk);
+              stdoutTail += chunk.toString();
+              if (stdoutTail.length > MAX_CAPTURE * 2) {
+                stdoutTail = stdoutTail.slice(-MAX_CAPTURE);
+              }
+            });
+            child.stderr!.on("data", (chunk: Buffer) => {
+              process.stderr.write(chunk);
+              stderrTail += chunk.toString();
+              if (stderrTail.length > MAX_CAPTURE * 2) {
+                stderrTail = stderrTail.slice(-MAX_CAPTURE);
+              }
+            });
+          }
 
           child.on("error", (err) => {
             reject(
@@ -180,10 +224,23 @@ export function makeExecCommand(): Command {
           });
         });
 
+        childExitCode = exitCode;
+
         // Step 5: Clean up heartbeats
         if (beatTimer) {
           clearInterval(beatTimer);
           beatTimer = undefined;
+        }
+
+        // Classify failure type from captured stderr
+        let failureClass: string | undefined;
+        if (captureEnabled && exitCode !== 0 && stderrTail) {
+          for (const pattern of PERMISSION_PATTERNS) {
+            if (pattern.test(stderrTail)) {
+              failureClass = "permission";
+              break;
+            }
+          }
         }
 
         // Step 6: Unlock (announce completion)
@@ -199,6 +256,9 @@ export function makeExecCommand(): Command {
           metadata: {
             duration_ms: String(duration),
             command: redactedCommand,
+            ...(captureEnabled && stdoutTail ? { stdout_tail: stdoutTail.slice(-MAX_CAPTURE) } : {}),
+            ...(captureEnabled && stderrTail ? { stderr_tail: stderrTail.slice(-MAX_CAPTURE) } : {}),
+            ...(failureClass ? { failure_class: failureClass } : {}),
           },
         });
 
@@ -212,6 +272,13 @@ export function makeExecCommand(): Command {
             exit_code: exitCode,
             duration_ms: duration,
             duration_human: formatDuration(duration),
+            ...(captureEnabled && {
+              captured: {
+                stdout_bytes: stdoutTail.length,
+                stderr_bytes: stderrTail.length,
+              },
+            }),
+            ...(failureClass ? { failure_class: failureClass } : {}),
           });
         } else if (!quiet) {
           chrome.blank();
@@ -248,7 +315,7 @@ export function makeExecCommand(): Command {
           try {
             await client.unlock(opts.service, {
               run_id: runId,
-              exit_code: 1,
+              exit_code: childExitCode ?? 1,
               message:
                 error instanceof Error ? error.message : String(error),
               metadata: {
@@ -259,6 +326,17 @@ export function makeExecCommand(): Command {
           } catch {
             // Best effort
           }
+        }
+
+        // If the child completed, preserve its exit code — the error is from
+        // unlock/summary, and agent-heart's failure should not mask it.
+        if (childExitCode !== undefined) {
+          if (!jsonOutput && !quiet) {
+            log.warn(
+              `agent-heart: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+          process.exit(childExitCode);
         }
 
         if (jsonOutput) {

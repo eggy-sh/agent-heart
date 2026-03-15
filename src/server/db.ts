@@ -34,6 +34,7 @@ export interface PulseDB {
   getStaleRuns(defaultCycleMs: number): Run[];
   getDeadRuns(defaultSilenceMs: number): Run[];
   upsertService(config: ServiceConfig): void;
+  getRecentRuns(serviceName: string, limit: number): Run[];
   getService(name: string): ServiceConfig | null;
   close(): void;
 }
@@ -331,6 +332,16 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       return rows.map(rowToRun);
     },
 
+    getRecentRuns(serviceName: string, limit: number): Run[] {
+      const rows = queryAll<RunRow>(db,
+        `SELECT * FROM runs WHERE service_name = $service
+         AND status IN ('completed', 'failed')
+         ORDER BY started_at DESC LIMIT $limit`,
+        { $service: serviceName, $limit: limit } as BindParams,
+      );
+      return rows.map(rowToRun);
+    },
+
     getServiceStates(): ServiceState[] {
       const serviceNames = queryAll<{ service_name: string }>(db,
         `SELECT DISTINCT name AS service_name FROM services
@@ -362,6 +373,23 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
           { $service_name: service_name } as BindParams,
         );
 
+        // Consecutive failure detection
+        const recentRuns = queryAll<RunRow>(db,
+          `SELECT * FROM runs WHERE service_name = $service
+           AND status IN ('completed', 'failed')
+           ORDER BY started_at DESC LIMIT 5`,
+          { $service: service_name } as BindParams,
+        ).map(rowToRun);
+
+        let consecutiveFailures = 0;
+        for (const run of recentRuns) {
+          if (run.status === "failed" && run.exit_code !== null && run.exit_code !== 0) {
+            consecutiveFailures++;
+          } else {
+            break;
+          }
+        }
+
         let status: RunStatus = "completed";
         let severity: Severity = "ok";
 
@@ -376,6 +404,11 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
           severity = "ok";
         }
 
+        // Escalate severity if looping
+        if (consecutiveFailures >= 3 && severity !== "critical") {
+          severity = "critical";
+        }
+
         return {
           service_name,
           status,
@@ -386,6 +419,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
           last_heartbeat: lastBeat?.last_heartbeat ?? null,
           expected_cycle_ms,
           max_silence_ms,
+          consecutive_failures: consecutiveFailures,
         };
       });
     },

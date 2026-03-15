@@ -62,6 +62,7 @@ export interface ServiceState {
   last_heartbeat: string | null;
   expected_cycle_ms: number;
   max_silence_ms: number;
+  consecutive_failures?: number;
 }
 
 export interface EndpointCheck {

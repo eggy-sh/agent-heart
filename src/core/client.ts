@@ -6,6 +6,7 @@ import type {
   OverviewResponse,
   Run,
   RunListResponse,
+  SpendResponse,
 } from "./models.js";
 import { getServerUrl, loadConfig } from "./config.js";
 
@@ -118,6 +119,18 @@ export class PulseClient {
 
   async overview(): Promise<OverviewResponse> {
     return this.request<OverviewResponse>("/api/v1/overview");
+  }
+
+  /** Token/cost spend aggregated per service and session, with budget status. */
+  async spend(params?: {
+    service?: string;
+    session?: string;
+  }): Promise<SpendResponse> {
+    const query = new URLSearchParams();
+    if (params?.service) query.set("service", params.service);
+    if (params?.session) query.set("session", params.session);
+    const qs = query.toString();
+    return this.request<SpendResponse>(`/api/v1/spend${qs ? `?${qs}` : ""}`);
   }
 
   // Context manager pattern for tracking runs

@@ -36,6 +36,11 @@ export interface PulseDB {
   upsertService(config: ServiceConfig): void;
   getRecentRuns(serviceName: string, limit: number): Run[];
   getService(name: string): ServiceConfig | null;
+  getSpend(filters?: { service?: string; session?: string }): {
+    services: { key: string; tokens: number; cost_usd: number; runs: number }[];
+    sessions: { key: string; tokens: number; cost_usd: number; runs: number }[];
+    total: { tokens: number; cost_usd: number; runs: number };
+  };
   close(): void;
 }
 
@@ -53,6 +58,8 @@ interface RunRow {
   message: string | null;
   exit_code: number | null;
   duration_ms: number | null;
+  tokens: number | null;
+  cost_usd: number | null;
   started_at: string;
   last_heartbeat: string;
   completed_at: string | null;
@@ -64,6 +71,8 @@ interface ServiceRow {
   expected_cycle_ms: number;
   max_silence_ms: number;
   endpoints: string;
+  budget_tokens: number | null;
+  budget_usd: number | null;
 }
 
 function rowToRun(row: RunRow): Run {
@@ -81,6 +90,8 @@ function rowToRun(row: RunRow): Run {
     message: row.message,
     exit_code: row.exit_code,
     duration_ms: row.duration_ms,
+    tokens: row.tokens ?? null,
+    cost_usd: row.cost_usd ?? null,
     started_at: row.started_at,
     last_heartbeat: row.last_heartbeat,
     completed_at: row.completed_at,
@@ -94,6 +105,8 @@ function rowToServiceConfig(row: ServiceRow): ServiceConfig {
     expected_cycle_ms: row.expected_cycle_ms,
     max_silence_ms: row.max_silence_ms,
     endpoints: JSON.parse(row.endpoints || "[]"),
+    budget_tokens: row.budget_tokens ?? undefined,
+    budget_usd: row.budget_usd ?? undefined,
   };
 }
 
@@ -107,6 +120,19 @@ function queryAll<T>(db: SqlJsDatabase, sql: string, params?: BindParams): T[] {
   }
   stmt.free();
   return rows;
+}
+
+/** Add a column to a table if it does not already exist (idempotent migration). */
+function ensureColumn(
+  db: SqlJsDatabase,
+  table: string,
+  column: string,
+  ddlType: string,
+): void {
+  const cols = queryAll<{ name: string }>(db, `PRAGMA table_info(${table})`);
+  if (!cols.some((c) => c.name === column)) {
+    db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddlType}`);
+  }
 }
 
 /** Run a SELECT and return the first matching row as an object */
@@ -152,6 +178,8 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       message TEXT,
       exit_code INTEGER,
       duration_ms INTEGER,
+      tokens INTEGER,
+      cost_usd REAL,
       started_at TEXT NOT NULL,
       last_heartbeat TEXT NOT NULL,
       completed_at TEXT,
@@ -167,7 +195,9 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       name TEXT PRIMARY KEY,
       expected_cycle_ms INTEGER NOT NULL,
       max_silence_ms INTEGER NOT NULL,
-      endpoints TEXT NOT NULL DEFAULT '[]'
+      endpoints TEXT NOT NULL DEFAULT '[]',
+      budget_tokens INTEGER,
+      budget_usd REAL
     );
 
     CREATE TABLE IF NOT EXISTS endpoints (
@@ -184,6 +214,13 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       FOREIGN KEY (service_name) REFERENCES services(name)
     );
   `);
+
+  // Migration: add cost/budget columns to databases created before this feature.
+  // CREATE TABLE IF NOT EXISTS never alters an existing table.
+  ensureColumn(db, "runs", "tokens", "INTEGER");
+  ensureColumn(db, "runs", "cost_usd", "REAL");
+  ensureColumn(db, "services", "budget_tokens", "INTEGER");
+  ensureColumn(db, "services", "budget_usd", "REAL");
 
   function save(): void {
     const data = db.export();
@@ -210,6 +247,8 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
         message: req.message ?? null,
         exit_code: null,
         duration_ms: null,
+        tokens: req.tokens ?? null,
+        cost_usd: req.cost_usd ?? null,
         started_at: now,
         last_heartbeat: now,
         completed_at: null,
@@ -219,10 +258,10 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       db.run(
         `INSERT INTO runs (run_id, session_id, service_name, tool_name, command, command_family,
           resource_kind, resource_id, status, severity, message, exit_code, duration_ms,
-          started_at, last_heartbeat, completed_at, metadata)
+          tokens, cost_usd, started_at, last_heartbeat, completed_at, metadata)
         VALUES ($run_id, $session_id, $service_name, $tool_name, $command, $command_family,
           $resource_kind, $resource_id, $status, $severity, $message, $exit_code, $duration_ms,
-          $started_at, $last_heartbeat, $completed_at, $metadata)`,
+          $tokens, $cost_usd, $started_at, $last_heartbeat, $completed_at, $metadata)`,
         {
           $run_id: run.run_id,
           $session_id: run.session_id,
@@ -237,6 +276,8 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
           $message: run.message,
           $exit_code: run.exit_code,
           $duration_ms: run.duration_ms,
+          $tokens: run.tokens,
+          $cost_usd: run.cost_usd,
           $started_at: run.started_at,
           $last_heartbeat: run.last_heartbeat,
           $completed_at: run.completed_at,
@@ -498,17 +539,21 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
 
     upsertService(config: ServiceConfig): void {
       db.run(
-        `INSERT INTO services (name, expected_cycle_ms, max_silence_ms, endpoints)
-        VALUES ($name, $expected_cycle_ms, $max_silence_ms, $endpoints)
+        `INSERT INTO services (name, expected_cycle_ms, max_silence_ms, endpoints, budget_tokens, budget_usd)
+        VALUES ($name, $expected_cycle_ms, $max_silence_ms, $endpoints, $budget_tokens, $budget_usd)
         ON CONFLICT(name) DO UPDATE SET
           expected_cycle_ms = $expected_cycle_ms,
           max_silence_ms = $max_silence_ms,
-          endpoints = $endpoints`,
+          endpoints = $endpoints,
+          budget_tokens = $budget_tokens,
+          budget_usd = $budget_usd`,
         {
           $name: config.name,
           $expected_cycle_ms: config.expected_cycle_ms,
           $max_silence_ms: config.max_silence_ms,
           $endpoints: JSON.stringify(config.endpoints ?? []),
+          $budget_tokens: config.budget_tokens ?? null,
+          $budget_usd: config.budget_usd ?? null,
         } as BindParams,
       );
       save();
@@ -520,6 +565,59 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
         { $name: name } as BindParams,
       );
       return row ? rowToServiceConfig(row) : null;
+    },
+
+    getSpend(filters?: { service?: string; session?: string }): {
+      services: { key: string; tokens: number; cost_usd: number; runs: number }[];
+      sessions: { key: string; tokens: number; cost_usd: number; runs: number }[];
+      total: { tokens: number; cost_usd: number; runs: number };
+    } {
+      const conditions: string[] = [];
+      const params: Record<string, unknown> = {};
+      if (filters?.service) {
+        conditions.push("service_name = $service");
+        params.$service = filters.service;
+      }
+      if (filters?.session) {
+        conditions.push("session_id = $session");
+        params.$session = filters.session;
+      }
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      const services = queryAll<{ key: string; tokens: number; cost_usd: number; runs: number }>(
+        db,
+        `SELECT service_name AS key,
+                COALESCE(SUM(tokens), 0) AS tokens,
+                COALESCE(SUM(cost_usd), 0) AS cost_usd,
+                COUNT(*) AS runs
+           FROM runs ${where}
+          GROUP BY service_name
+          ORDER BY cost_usd DESC, tokens DESC`,
+        params as BindParams,
+      );
+
+      const sessions = queryAll<{ key: string; tokens: number; cost_usd: number; runs: number }>(
+        db,
+        `SELECT session_id AS key,
+                COALESCE(SUM(tokens), 0) AS tokens,
+                COALESCE(SUM(cost_usd), 0) AS cost_usd,
+                COUNT(*) AS runs
+           FROM runs ${where} ${where ? "AND" : "WHERE"} session_id IS NOT NULL
+          GROUP BY session_id
+          ORDER BY cost_usd DESC, tokens DESC`,
+        params as BindParams,
+      );
+
+      const total = queryOne<{ tokens: number; cost_usd: number; runs: number }>(
+        db,
+        `SELECT COALESCE(SUM(tokens), 0) AS tokens,
+                COALESCE(SUM(cost_usd), 0) AS cost_usd,
+                COUNT(*) AS runs
+           FROM runs ${where}`,
+        params as BindParams,
+      ) ?? { tokens: 0, cost_usd: 0, runs: 0 };
+
+      return { services, sessions, total };
     },
 
     close(): void {

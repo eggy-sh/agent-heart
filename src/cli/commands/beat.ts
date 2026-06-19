@@ -9,6 +9,8 @@ export function makeBeatCommand(): Command {
     .option("--run-id <id>", "Run ID to associate the heartbeat with")
     .option("-s, --session <id>", "Session ID")
     .option("-m, --message <msg>", "Human-readable status message")
+    .option("--tokens <n>", "Cumulative tokens used by this run so far", parseInt)
+    .option("--cost <usd>", "Cumulative cost (USD) of this run so far", parseFloat)
     .action(async (service: string, opts) => {
       const parentOpts = beat.parent?.opts() ?? {};
       const jsonOutput = parentOpts.json === true;
@@ -22,6 +24,8 @@ export function makeBeatCommand(): Command {
         const response = await client.beat(service, {
           run_id: opts.runId,
           message: opts.message,
+          ...(opts.tokens !== undefined && { tokens: opts.tokens }),
+          ...(opts.cost !== undefined && { cost_usd: opts.cost }),
         });
 
         if (jsonOutput) {

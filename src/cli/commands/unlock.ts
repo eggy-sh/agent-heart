@@ -14,6 +14,8 @@ export function makeUnlockCommand(): Command {
       parseInt,
     )
     .option("-m, --message <msg>", "Completion message")
+    .option("--tokens <n>", "Total tokens used by this run", parseInt)
+    .option("--cost <usd>", "Total cost (USD) of this run", parseFloat)
     .action(async (service: string, opts) => {
       const parentOpts = unlock.parent?.opts() ?? {};
       const jsonOutput = parentOpts.json === true;
@@ -28,6 +30,8 @@ export function makeUnlockCommand(): Command {
           run_id: opts.runId,
           exit_code: opts.exitCode,
           message: opts.message,
+          ...(opts.tokens !== undefined && { tokens: opts.tokens }),
+          ...(opts.cost !== undefined && { cost_usd: opts.cost }),
         });
 
         if (jsonOutput) {

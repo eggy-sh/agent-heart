@@ -15,5 +15,11 @@ export type {
   ExecResult,
   PulseConfig,
   Severity,
+  SpendResponse,
+  ServiceSpend,
+  SpendScope,
+  BudgetEval,
+  BudgetMetric,
 } from "./core/models.js";
 export { loadConfig, getServerUrl } from "./core/config.js";
+export { evaluateBudget, isOverBudget } from "./core/budget.js";

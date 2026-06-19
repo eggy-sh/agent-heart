@@ -10,6 +10,8 @@ export function makeLockCommand(): Command {
     .option("-t, --tool <name>", "Tool name being invoked")
     .option("-r, --resource <kind>", "Resource kind being acted on")
     .option("-m, --message <msg>", "Human-readable message for the lock event")
+    .option("--tokens <n>", "Initial tokens used by this run", parseInt)
+    .option("--cost <usd>", "Initial cost (USD) of this run", parseFloat)
     .option("--metadata <json>", "Additional metadata as JSON string")
     .action(async (service: string, opts) => {
       const parentOpts = lock.parent?.opts() ?? {};
@@ -35,6 +37,8 @@ export function makeLockCommand(): Command {
           tool_name: opts.tool,
           resource_kind: opts.resource,
           message: opts.message,
+          ...(opts.tokens !== undefined && { tokens: opts.tokens }),
+          ...(opts.cost !== undefined && { cost_usd: opts.cost }),
           metadata,
         });
 

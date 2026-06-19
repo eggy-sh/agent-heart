@@ -35,6 +35,7 @@ export type Severity = (typeof Severity)[keyof typeof Severity];
 export interface Run {
   run_id: string;
   session_id: string | null;
+  parent_run_id: string | null;
   service_name: string;
   tool_name: string | null;
   command: string | null;
@@ -83,6 +84,7 @@ export const HeartbeatRequestSchema = z.object({
   action: z.enum(["lock", "beat", "unlock"]),
   run_id: z.string().optional(),
   session_id: z.string().optional(),
+  parent_run_id: z.string().optional(),
   tool_name: z.string().optional(),
   command: z.string().optional(),
   command_family: z.string().optional(),

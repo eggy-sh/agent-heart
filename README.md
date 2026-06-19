@@ -42,6 +42,8 @@ That is the gap `agent-heart` is built to fill.
 
 **Silent failure detection** -- if a run stops sending heartbeats entirely, it is marked `dead`. No more silent disappearances.
 
+**Orchestration trees** -- when an agent spins up sub-tasks, they form a parent/child tree. `status --tree` shows the whole hierarchy and bubbles a stuck or dead leaf up to the root. Sub-tasks attach automatically in any harness -- no run-id wiring.
+
 **Universal CLI wrapper** -- wrap any command with `npx agent-heart exec` and get automatic lifecycle tracking, duration capture, and exit code recording. No code changes required.
 
 ```
@@ -119,7 +121,33 @@ npx agent-heart status                      # all runs
 npx agent-heart status --service github      # filter by service
 npx agent-heart status --filter stale,dead   # only problems
 npx agent-heart status --json                # pipe to jq
+npx agent-heart status --tree                # render parent → child runs
 ```
+
+### Orchestration Trees -- Dynamic Sub-Threads
+
+When an orchestrator agent spins up sub-tasks, each one can attach to its parent, forming a tree. The killer part is that it requires **no wiring**: `exec` exports the current run id as `AGENT_HEART_RUN_ID`, and every nested `agent-heart` call picks it up as its parent. Because every harness propagates environment variables to child processes, this works the same in Claude Code, a bare shell, or CI.
+
+```bash
+# Wrap the orchestrator — nested agent-heart calls become children automatically
+npx agent-heart exec --service refactor-api --tool orchestrator -- ./refactor.sh
+
+# Manual lifecycles can attach explicitly
+npx agent-heart lock build --parent run_k7xPm2
+```
+
+```bash
+npx agent-heart status --tree
+```
+
+```
+  refactor-api    orchestrator  active   1.7s (3 sub)
+  ├─ extract-module  agent    completed  163ms
+  └─ update-imports  agent    active     1.2s (1 sub) ⚠ subtree warning
+     └─ run-tests     vitest   stale      1.1s
+```
+
+A stuck or dead leaf bubbles a `⚠ subtree` annotation up to the root, so one glance tells you which branch is in trouble. `runs --tree` renders the same way; `--json` returns the nested structure for an agent loop to act on. Remote callers can pull a subtree via `GET /api/v1/runs/:id/tree`, and SDK users get `client.getRunTree(runId)` plus the pure `buildRunForest(runs)` helper.
 
 ### `server start` / `init`
 

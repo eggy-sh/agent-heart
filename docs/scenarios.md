@@ -269,6 +269,46 @@ If the upload stalls (large file, flaky connection), you see it go `stale` befor
 
 ---
 
+## 6. Orchestrating Sub-Agents (Dynamic Sub-Threads)
+
+An orchestrator agent breaks a big job — "refactor the API package" — into sub-tasks it spins up dynamically: extract a module, update imports, run the tests. You want a single view of the whole tree and an instant read on whether any branch is stuck, without wiring run IDs through every layer.
+
+### Auto-parenting — no manual wiring
+
+Wrap the orchestrator in `exec`. Every nested `agent-heart` call inside automatically attaches as a child, because `exec` exports the current run id (`AGENT_HEART_RUN_ID`) to the child environment. This works in **any harness** — Claude Code, a bare shell, CI — since they all propagate environment variables to child processes.
+
+```bash
+npx agent-heart exec --service refactor-api --tool orchestrator -- ./refactor.sh
+```
+
+Inside `refactor.sh`, the sub-tasks need no special flags:
+
+```bash
+# These become children of the orchestrator run automatically.
+npx agent-heart exec --service extract-module --tool agent -- ./extract.sh
+npx agent-heart exec --service update-imports --tool agent -- ./update-imports.sh
+npx agent-heart exec --service run-tests --tool vitest -- npm test
+```
+
+For manual lifecycles, pass `--parent <run-id>` (or export `AGENT_HEART_RUN_ID`) to `lock`.
+
+### Seeing the tree
+
+```bash
+npx agent-heart status --tree
+```
+
+```
+  refactor-api    orchestrator  active   1.7s (3 sub)
+  ├─ extract-module  agent    completed  163ms
+  └─ update-imports  agent    active     1.2s (1 sub) ⚠ subtree warning
+     └─ run-tests     vitest   stale      1.1s
+```
+
+A stuck leaf bubbles up: the orchestrator row is annotated `⚠ subtree warning` because `run-tests` went `stale`, so you spot the problem branch from the root without expanding anything. `runs --tree` renders the same way, and `--json` returns the nested structure for an agent loop to act on. A remote orchestrator can also pull a subtree directly: `GET /api/v1/runs/:id/tree`.
+
+---
+
 ## Naming Convention
 
 Services follow a `<runtime>/<tool_or_family>` pattern:

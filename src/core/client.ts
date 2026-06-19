@@ -98,6 +98,11 @@ export class PulseClient {
     return this.request<Run>(`/api/v1/runs/${runId}`);
   }
 
+  /** Fetch a run plus all of its descendants (root first). */
+  async getRunTree(runId: string): Promise<RunListResponse> {
+    return this.request<RunListResponse>(`/api/v1/runs/${runId}/tree`);
+  }
+
   async listRuns(params?: {
     service?: string;
     status?: string;

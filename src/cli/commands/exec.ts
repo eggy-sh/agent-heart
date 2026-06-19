@@ -4,18 +4,8 @@ import chalk from "chalk";
 import { PulseClient } from "../../core/client.js";
 import { redactCommand } from "../../utils/redact.js";
 import { PARENT_RUN_ID_ENV, resolveParentRunId } from "../../core/parentage.js";
+import { classifyFailure } from "../../core/classify.js";
 import { log, chrome, formatDuration } from "../../utils/logger.js";
-
-const PERMISSION_PATTERNS = [
-  /permission denied/i,
-  /\b403\b/,
-  /\b401\b/,
-  /unauthorized/i,
-  /not authorized/i,
-  /EPERM\b/,
-  /EACCES\b/,
-  /access denied/i,
-];
 
 export function makeExecCommand(): Command {
   const exec = new Command("exec")
@@ -243,15 +233,10 @@ export function makeExecCommand(): Command {
         }
 
         // Classify failure type from captured stderr
-        let failureClass: string | undefined;
-        if (captureEnabled && exitCode !== 0 && stderrTail) {
-          for (const pattern of PERMISSION_PATTERNS) {
-            if (pattern.test(stderrTail)) {
-              failureClass = "permission";
-              break;
-            }
-          }
-        }
+        const failureClass =
+          captureEnabled && exitCode !== 0
+            ? classifyFailure(stderrTail)
+            : undefined;
 
         // Step 6: Unlock (announce completion)
         const duration = Date.now() - startTime;

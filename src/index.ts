@@ -17,3 +17,5 @@ export type {
   Severity,
 } from "./core/models.js";
 export { loadConfig, getServerUrl } from "./core/config.js";
+export { evaluateWatch } from "./core/watch.js";
+export type { WatchVerdict } from "./core/watch.js";

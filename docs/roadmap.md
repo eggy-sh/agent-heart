@@ -21,6 +21,7 @@
 
 ## Phase 4: Operational Views
 
+- `watch` — block until runs resolve, with exit codes and webhook notify (the heartbeat "walk away" pattern) ✅
 - Active sessions dashboard
 - Top failing tools
 - Resource access breakdown

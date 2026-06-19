@@ -42,6 +42,8 @@ That is the gap `agent-heart` is built to fill.
 
 **Silent failure detection** -- if a run stops sending heartbeats entirely, it is marked `dead`. No more silent disappearances.
 
+**Walk away and get told** -- `npx agent-heart watch` blocks until your background work resolves (everything finished, or something died), then exits with a status-reflecting code and can fire a webhook. Orchestrate long-running work without babysitting a polling loop.
+
 **Universal CLI wrapper** -- wrap any command with `npx agent-heart exec` and get automatic lifecycle tracking, duration capture, and exit code recording. No code changes required.
 
 ```
@@ -120,6 +122,32 @@ npx agent-heart status --service github      # filter by service
 npx agent-heart status --filter stale,dead   # only problems
 npx agent-heart status --json                # pipe to jq
 ```
+
+### `watch` -- Walk Away
+
+The heartbeat pattern: instead of busy-polling `status` in a loop, block on one command that returns the moment your background work resolves. The exit code tells you the outcome, so a script or agent loop can branch on it.
+
+```bash
+# Block until every run in a session settles. Exit 0 if all completed, 1 if any failed/died.
+npx agent-heart watch --session deploy-v2.3.1
+
+# Death alarm: return the instant a run dies or stalls
+npx agent-heart watch --service refactor --until dead,stale
+
+# Walk away with a timeout and a notification
+npx agent-heart watch --session overnight-refactor --timeout 3600 --webhook "$SLACK_WEBHOOK"
+```
+
+Exit codes: **0** all relevant runs completed cleanly · **1** resolved but something failed/died · **124** timed out (like `timeout(1)`) · **2** no scope given.
+
+Compose it straight into a pipeline — kick off background work, then block on it:
+
+```bash
+./start-refactor.sh                                  # spawns tracked runs in session "refactor"
+npx agent-heart watch --session refactor --timeout 1800 && ./ship.sh || ./page-me.sh
+```
+
+The watched set is re-read each tick, so sub-tasks an orchestrator spawns mid-watch are included. `--json` emits the final verdict for an agent loop; `evaluateWatch(runs, until)` is exported from the package root for custom waiters.
 
 ### `server start` / `init`
 

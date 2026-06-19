@@ -27,14 +27,22 @@ function bar(pct: number | null, severity: Severity, width = 10): string {
   return sevColor(severity)("█".repeat(filled)) + chalk.dim("░".repeat(width - filled));
 }
 
+/** The metric (cost or tokens) closest to its limit — the one that drives the
+ *  service's overall severity, so the rendered bar never contradicts the verdict. */
+function drivingMetric(
+  s: ServiceSpend,
+): { m: ServiceSpend["budget"]["tokens"]; fmt: (n: number) => string; used: number } | null {
+  const candidates = [];
+  if (s.budget.cost_usd.limit != null)
+    candidates.push({ m: s.budget.cost_usd, fmt: fmtUsd, used: s.cost_usd });
+  if (s.budget.tokens.limit != null)
+    candidates.push({ m: s.budget.tokens, fmt: fmtTokens, used: s.tokens });
+  if (candidates.length === 0) return null;
+  return candidates.sort((a, z) => (z.m.pct ?? 0) - (a.m.pct ?? 0))[0];
+}
+
 function budgetCell(s: ServiceSpend): string {
-  const b = s.budget;
-  const metric =
-    b.cost_usd.limit != null
-      ? { m: b.cost_usd, fmt: fmtUsd, used: s.cost_usd }
-      : b.tokens.limit != null
-        ? { m: b.tokens, fmt: fmtTokens, used: s.tokens }
-        : null;
+  const metric = drivingMetric(s);
   if (!metric || metric.m.limit == null) return chalk.dim("no budget");
   const color = sevColor(metric.m.severity);
   return (
@@ -42,6 +50,13 @@ function budgetCell(s: ServiceSpend): string {
     `${bar(metric.m.pct, metric.m.severity)} ` +
     `${color((metric.m.pct ?? 0) + "%")}`
   );
+}
+
+/** Plain-text (no ANSI) budget summary for log lines. */
+function budgetSummary(s: ServiceSpend): string {
+  const metric = drivingMetric(s);
+  if (!metric || metric.m.limit == null) return "no budget";
+  return `${metric.fmt(metric.used)}/${metric.fmt(metric.m.limit)} (${metric.m.pct ?? 0}%)`;
 }
 
 export function makeSpendCommand(): Command {
@@ -135,7 +150,7 @@ export function makeSpendCommand(): Command {
         if (overBudget.length > 0) {
           for (const s of overBudget) {
             log.error(
-              `${s.key} is over budget — ${budgetCell(s).replace(/\[[0-9;]*m/g, "")}`,
+              `${s.key} is over budget — ${budgetSummary(s)}`,
             );
           }
           chrome.blank();

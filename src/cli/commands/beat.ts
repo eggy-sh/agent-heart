@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { PulseClient } from "../../core/client.js";
+import { parseIntArg, parseFloatArg } from "../parse.js";
 import { log } from "../../utils/logger.js";
 
 export function makeBeatCommand(): Command {
@@ -9,8 +10,8 @@ export function makeBeatCommand(): Command {
     .option("--run-id <id>", "Run ID to associate the heartbeat with")
     .option("-s, --session <id>", "Session ID")
     .option("-m, --message <msg>", "Human-readable status message")
-    .option("--tokens <n>", "Cumulative tokens used by this run so far", parseInt)
-    .option("--cost <usd>", "Cumulative cost (USD) of this run so far", parseFloat)
+    .option("--tokens <n>", "Cumulative tokens used by this run so far", parseIntArg)
+    .option("--cost <usd>", "Cumulative cost (USD) of this run so far", parseFloatArg)
     .action(async (service: string, opts) => {
       const parentOpts = beat.parent?.opts() ?? {};
       const jsonOutput = parentOpts.json === true;

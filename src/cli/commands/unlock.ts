@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { PulseClient } from "../../core/client.js";
+import { parseIntArg, parseFloatArg } from "../parse.js";
 import { log } from "../../utils/logger.js";
 
 export function makeUnlockCommand(): Command {
@@ -11,11 +12,11 @@ export function makeUnlockCommand(): Command {
     .option(
       "--exit-code <n>",
       "Exit code of the completed work",
-      parseInt,
+      parseIntArg,
     )
     .option("-m, --message <msg>", "Completion message")
-    .option("--tokens <n>", "Total tokens used by this run", parseInt)
-    .option("--cost <usd>", "Total cost (USD) of this run", parseFloat)
+    .option("--tokens <n>", "Total tokens used by this run", parseIntArg)
+    .option("--cost <usd>", "Total cost (USD) of this run", parseFloatArg)
     .action(async (service: string, opts) => {
       const parentOpts = unlock.parent?.opts() ?? {};
       const jsonOutput = parentOpts.json === true;

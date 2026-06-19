@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { PulseClient } from "../../core/client.js";
+import { parseIntArg, parseFloatArg } from "../parse.js";
 import { log } from "../../utils/logger.js";
 
 export function makeLockCommand(): Command {
@@ -10,8 +11,8 @@ export function makeLockCommand(): Command {
     .option("-t, --tool <name>", "Tool name being invoked")
     .option("-r, --resource <kind>", "Resource kind being acted on")
     .option("-m, --message <msg>", "Human-readable message for the lock event")
-    .option("--tokens <n>", "Initial tokens used by this run", parseInt)
-    .option("--cost <usd>", "Initial cost (USD) of this run", parseFloat)
+    .option("--tokens <n>", "Initial tokens used by this run", parseIntArg)
+    .option("--cost <usd>", "Initial cost (USD) of this run", parseFloatArg)
     .option("--metadata <json>", "Additional metadata as JSON string")
     .action(async (service: string, opts) => {
       const parentOpts = lock.parent?.opts() ?? {};

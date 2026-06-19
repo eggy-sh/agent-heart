@@ -15,5 +15,8 @@ export type {
   ExecResult,
   PulseConfig,
   Severity,
+  VerificationStatus,
+  VerificationSummary,
 } from "./core/models.js";
 export { loadConfig, getServerUrl } from "./core/config.js";
+export { summarizeVerification } from "./core/verification.js";

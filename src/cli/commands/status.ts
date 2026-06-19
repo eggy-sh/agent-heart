@@ -2,6 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import Table from "cli-table3";
 import { PulseClient } from "../../core/client.js";
+import { summarizeVerification } from "../../core/verification.js";
 import {
   log,
   chrome,
@@ -71,6 +72,27 @@ export function makeStatusCommand(): Command {
           `  ${chalk.green(runs.active)} active  ${chalk.yellow(runs.stale)} stale  ${chalk.red(runs.dead)} dead  ${chalk.dim(runs.completed + " completed")}  ${chalk.dim(runs.failed + " failed")}`,
         );
         chrome.blank();
+
+        // Verification oversight: surface completed runs still awaiting review.
+        try {
+          const forVerify = await client.listRuns({
+            service: opts.service,
+            limit: 500,
+          });
+          const v = summarizeVerification(forVerify.runs);
+          if (v.pending > 0 || v.failed > 0) {
+            const parts: string[] = [];
+            if (v.pending > 0)
+              parts.push(chalk.yellow(`${v.pending} awaiting verification`));
+            if (v.failed > 0)
+              parts.push(chalk.red(`${v.failed} verification failed`));
+            if (v.passed > 0) parts.push(chalk.dim(`${v.passed} verified`));
+            chrome.log("  " + parts.join("  "));
+            chrome.blank();
+          }
+        } catch {
+          // Non-fatal — verification summary is best-effort.
+        }
 
         // Services table
         let services = overview.services;

@@ -14,6 +14,10 @@ export function makeUnlockCommand(): Command {
       parseInt,
     )
     .option("-m, --message <msg>", "Completion message")
+    .option(
+      "--needs-verify",
+      "Mark the run completed-but-unverified (awaiting oversight)",
+    )
     .action(async (service: string, opts) => {
       const parentOpts = unlock.parent?.opts() ?? {};
       const jsonOutput = parentOpts.json === true;
@@ -28,6 +32,7 @@ export function makeUnlockCommand(): Command {
           run_id: opts.runId,
           exit_code: opts.exitCode,
           message: opts.message,
+          ...(opts.needsVerify && { requires_verification: true }),
         });
 
         if (jsonOutput) {

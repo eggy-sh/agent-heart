@@ -12,6 +12,7 @@
 - Session and run correlation
 - Duration and failure categorization
 - Stale/dead classification tuning
+- Verification gates — completed-but-unverified runs with a `verify` oversight verdict ✅
 
 ## Phase 3: Hook Integrations
 

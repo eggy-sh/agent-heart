@@ -42,6 +42,8 @@ That is the gap `agent-heart` is built to fill.
 
 **Silent failure detection** -- if a run stops sending heartbeats entirely, it is marked `dead`. No more silent disappearances.
 
+**Verification gates** -- a run finishing isn't the same as a run being trusted. Mark work `completed-but-unverified` (`unlock --needs-verify`), then record an oversight verdict with `verify` after tests/self-review pass. `status` shows what's still awaiting review.
+
 **Universal CLI wrapper** -- wrap any command with `npx agent-heart exec` and get automatic lifecycle tracking, duration capture, and exit code recording. No code changes required.
 
 ```
@@ -120,6 +122,34 @@ npx agent-heart status --service github      # filter by service
 npx agent-heart status --filter stale,dead   # only problems
 npx agent-heart status --json                # pipe to jq
 ```
+
+### `verify` -- Oversight Gates
+
+When an agent marks its own work complete, "completed" doesn't mean "verified." Gate trust on an explicit check: finish the run as **completed-but-unverified**, then record a verdict once tests or a review pass.
+
+```bash
+# The agent finishes its work but flags it for oversight
+npx agent-heart unlock build --run-id run_k7xPm2 --exit-code 0 --needs-verify
+
+# What still needs review?
+npx agent-heart status                 # "1 awaiting verification"
+npx agent-heart runs --unverified      # list just those runs
+
+# Record the verdict after tests / self-review
+npx agent-heart verify --run-id run_k7xPm2 --pass
+npx agent-heart verify --run-id run_k7xPm2 --fail --message "integration tests red"
+```
+
+A loop can gate on it — only ship work that's been verified:
+
+```bash
+./agent-does-the-work.sh              # ends with unlock --needs-verify
+./run-tests.sh && npx agent-heart verify --run-id "$RUN" --pass \
+              || npx agent-heart verify --run-id "$RUN" --fail
+# A supervisor sees anything still pending via: agent-heart runs --unverified --json
+```
+
+SDK: `client.verify(runId, { status, message })`, plus `summarizeVerification(runs)` from the package root.
 
 ### `server start` / `init`
 

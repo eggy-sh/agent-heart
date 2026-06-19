@@ -30,6 +30,15 @@ export const Severity = {
 
 export type Severity = (typeof Severity)[keyof typeof Severity];
 
+export const VerificationStatus = {
+  PENDING: "pending",
+  PASSED: "passed",
+  FAILED: "failed",
+} as const;
+
+export type VerificationStatus =
+  (typeof VerificationStatus)[keyof typeof VerificationStatus];
+
 // --- Core Models ---
 
 export interface Run {
@@ -46,6 +55,7 @@ export interface Run {
   message: string | null;
   exit_code: number | null;
   duration_ms: number | null;
+  verification: VerificationStatus | null;
   started_at: string;
   last_heartbeat: string;
   completed_at: string | null;
@@ -90,8 +100,16 @@ export const HeartbeatRequestSchema = z.object({
   resource_id: z.string().optional(),
   message: z.string().optional(),
   exit_code: z.number().int().optional(),
+  requires_verification: z.boolean().optional(),
   metadata: z.record(z.string()).optional(),
 });
+
+export const VerifyRequestSchema = z.object({
+  status: z.enum(["passed", "failed"]),
+  message: z.string().optional(),
+});
+
+export type VerifyRequest = z.infer<typeof VerifyRequestSchema>;
 
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequestSchema>;
 
@@ -120,6 +138,12 @@ export interface OverviewResponse {
 export interface RunListResponse {
   runs: Run[];
   total: number;
+}
+
+export interface VerificationSummary {
+  pending: number;
+  passed: number;
+  failed: number;
 }
 
 // --- Configuration ---

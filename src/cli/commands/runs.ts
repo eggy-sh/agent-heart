@@ -103,11 +103,13 @@ export function makeRunsCommand(): Command {
     .option("--service <name>", "Filter by service name")
     .option("--status <statuses>", "Filter by status (comma-separated: active,stale,dead,completed,failed,locked)")
     .option("--session <id>", "Filter by session ID")
+    .option("--unverified", "Only runs completed-but-awaiting-verification")
     .option("--limit <n>", "Maximum number of runs to show", parseInt)
     .action(async (opts) => {
       const parentOpts = runs.parent?.opts() ?? {};
       const jsonOutput = parentOpts.json === true;
-      const limit = opts.limit ?? 20;
+      // Widen the fetch when filtering client-side so pending runs aren't cut off.
+      const limit = opts.limit ?? (opts.unverified ? 500 : 20);
 
       const client = new PulseClient({
         serverUrl: parentOpts.server,
@@ -120,6 +122,12 @@ export function makeRunsCommand(): Command {
           session_id: opts.session,
           limit,
         });
+        if (opts.unverified) {
+          response.runs = response.runs.filter(
+            (r) => r.verification === "pending",
+          );
+          response.total = response.runs.length;
+        }
 
         if (jsonOutput) {
           log.json(response);

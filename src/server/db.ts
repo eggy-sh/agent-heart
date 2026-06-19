@@ -8,12 +8,14 @@ import type {
   ServiceState,
   ServiceConfig,
   HeartbeatRequest,
+  VerificationStatus,
 } from "../core/models.js";
 
 export interface PulseDB {
   createRun(req: HeartbeatRequest): Run;
   updateRun(runId: string, updates: Partial<Run>): Run;
   getRun(runId: string): Run | null;
+  verifyRun(runId: string, status: VerificationStatus, message?: string): Run;
   listRuns(filters?: {
     service?: string;
     status?: string;
@@ -53,6 +55,7 @@ interface RunRow {
   message: string | null;
   exit_code: number | null;
   duration_ms: number | null;
+  verification: string | null;
   started_at: string;
   last_heartbeat: string;
   completed_at: string | null;
@@ -81,6 +84,8 @@ function rowToRun(row: RunRow): Run {
     message: row.message,
     exit_code: row.exit_code,
     duration_ms: row.duration_ms,
+    verification:
+      (row.verification as Run["verification"]) ?? null,
     started_at: row.started_at,
     last_heartbeat: row.last_heartbeat,
     completed_at: row.completed_at,
@@ -107,6 +112,19 @@ function queryAll<T>(db: SqlJsDatabase, sql: string, params?: BindParams): T[] {
   }
   stmt.free();
   return rows;
+}
+
+/** Add a column to a table if it does not already exist (idempotent migration). */
+function ensureColumn(
+  db: SqlJsDatabase,
+  table: string,
+  column: string,
+  ddlType: string,
+): void {
+  const cols = queryAll<{ name: string }>(db, `PRAGMA table_info(${table})`);
+  if (!cols.some((c) => c.name === column)) {
+    db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddlType}`);
+  }
 }
 
 /** Run a SELECT and return the first matching row as an object */
@@ -152,6 +170,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       message TEXT,
       exit_code INTEGER,
       duration_ms INTEGER,
+      verification TEXT,
       started_at TEXT NOT NULL,
       last_heartbeat TEXT NOT NULL,
       completed_at TEXT,
@@ -185,6 +204,10 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
     );
   `);
 
+  // Migration: add the verification column to databases created before this
+  // feature. CREATE TABLE IF NOT EXISTS never alters an existing table.
+  ensureColumn(db, "runs", "verification", "TEXT");
+
   function save(): void {
     const data = db.export();
     writeFileSync(dbPath, Buffer.from(data));
@@ -210,6 +233,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
         message: req.message ?? null,
         exit_code: null,
         duration_ms: null,
+        verification: null,
         started_at: now,
         last_heartbeat: now,
         completed_at: null,
@@ -219,10 +243,10 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       db.run(
         `INSERT INTO runs (run_id, session_id, service_name, tool_name, command, command_family,
           resource_kind, resource_id, status, severity, message, exit_code, duration_ms,
-          started_at, last_heartbeat, completed_at, metadata)
+          verification, started_at, last_heartbeat, completed_at, metadata)
         VALUES ($run_id, $session_id, $service_name, $tool_name, $command, $command_family,
           $resource_kind, $resource_id, $status, $severity, $message, $exit_code, $duration_ms,
-          $started_at, $last_heartbeat, $completed_at, $metadata)`,
+          $verification, $started_at, $last_heartbeat, $completed_at, $metadata)`,
         {
           $run_id: run.run_id,
           $session_id: run.session_id,
@@ -237,6 +261,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
           $message: run.message,
           $exit_code: run.exit_code,
           $duration_ms: run.duration_ms,
+          $verification: run.verification,
           $started_at: run.started_at,
           $last_heartbeat: run.last_heartbeat,
           $completed_at: run.completed_at,
@@ -290,6 +315,30 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
         { $run_id: runId } as BindParams,
       );
       return row ? rowToRun(row) : null;
+    },
+
+    verifyRun(runId: string, status: VerificationStatus, message?: string): Run {
+      const existing = queryOne<RunRow>(db,
+        `SELECT run_id FROM runs WHERE run_id = $id`,
+        { $id: runId } as BindParams,
+      );
+      if (!existing) {
+        throw new Error(`Run not found: ${runId}`);
+      }
+      db.run(
+        `UPDATE runs SET verification = $v${message !== undefined ? ", message = $m" : ""} WHERE run_id = $id`,
+        {
+          $v: status,
+          $id: runId,
+          ...(message !== undefined ? { $m: message } : {}),
+        } as BindParams,
+      );
+      save();
+      const updated = queryOne<RunRow>(db,
+        `SELECT * FROM runs WHERE run_id = $id`,
+        { $id: runId } as BindParams,
+      );
+      return rowToRun(updated!);
     },
 
     listRuns(filters?: {

@@ -2,6 +2,8 @@ import { Command } from "commander";
 import chalk from "chalk";
 import Table from "cli-table3";
 import { PulseClient } from "../../core/client.js";
+import { buildRunForest, filterForest } from "../../core/tree.js";
+import { renderForest, forestToJson } from "../render-tree.js";
 import {
   log,
   chrome,
@@ -103,23 +105,75 @@ export function makeRunsCommand(): Command {
     .option("--service <name>", "Filter by service name")
     .option("--status <statuses>", "Filter by status (comma-separated: active,stale,dead,completed,failed,locked)")
     .option("--session <id>", "Filter by session ID")
+    .option("--tree", "Render runs as an orchestration tree (parent → children)")
+    .option("--unverified", "Only runs completed-but-awaiting-verification")
     .option("--limit <n>", "Maximum number of runs to show", parseInt)
     .action(async (opts) => {
       const parentOpts = runs.parent?.opts() ?? {};
       const jsonOutput = parentOpts.json === true;
-      const limit = opts.limit ?? 20;
+      // Widen the fetch when filtering client-side so trees include completed
+      // children and pending runs aren't cut off.
+      const limit = opts.limit ?? (opts.tree || opts.unverified ? 500 : 20);
 
       const client = new PulseClient({
         serverUrl: parentOpts.server,
       });
 
       try {
+        if (opts.tree) {
+          // Build from the full run set so parent→child edges survive, then
+          // treat any filters as a "show trees that contain a match" selector.
+          const treeList = await client.listRuns({ limit });
+          let forest = buildRunForest(treeList.runs);
+
+          const statuses: string[] | null = opts.status
+            ? opts.status.split(",").map((s: string) => s.trim()).filter(Boolean)
+            : null;
+          if (opts.service || statuses || opts.session) {
+            forest = filterForest(
+              forest,
+              (r) =>
+                (!opts.service || r.service_name === opts.service) &&
+                (!statuses || statuses.includes(r.status)) &&
+                (!opts.session || r.session_id === opts.session),
+            );
+          }
+
+          if (jsonOutput) {
+            log.json({ forest: forestToJson(forest), total: treeList.total });
+            return;
+          }
+
+          if (forest.length === 0) {
+            log.dim("No runs found.");
+            return;
+          }
+
+          chrome.blank();
+          chrome.log(
+            chalk.bold.cyan("  Runs — tree") +
+              chalk.dim(` (${forest.length} ${forest.length === 1 ? "tree" : "trees"})`),
+          );
+          chrome.blank();
+          for (const line of renderForest(forest)) {
+            console.log("  " + line);
+          }
+          chrome.blank();
+          return;
+        }
+
         const response = await client.listRuns({
           service: opts.service,
           status: opts.status,
           session_id: opts.session,
           limit,
         });
+        if (opts.unverified) {
+          response.runs = response.runs.filter(
+            (r) => r.verification === "pending",
+          );
+          response.total = response.runs.length;
+        }
 
         if (jsonOutput) {
           log.json(response);

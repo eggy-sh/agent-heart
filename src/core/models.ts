@@ -30,11 +30,21 @@ export const Severity = {
 
 export type Severity = (typeof Severity)[keyof typeof Severity];
 
+export const VerificationStatus = {
+  PENDING: "pending",
+  PASSED: "passed",
+  FAILED: "failed",
+} as const;
+
+export type VerificationStatus =
+  (typeof VerificationStatus)[keyof typeof VerificationStatus];
+
 // --- Core Models ---
 
 export interface Run {
   run_id: string;
   session_id: string | null;
+  parent_run_id: string | null;
   service_name: string;
   tool_name: string | null;
   command: string | null;
@@ -46,6 +56,9 @@ export interface Run {
   message: string | null;
   exit_code: number | null;
   duration_ms: number | null;
+  tokens: number | null;
+  cost_usd: number | null;
+  verification: VerificationStatus | null;
   started_at: string;
   last_heartbeat: string;
   completed_at: string | null;
@@ -83,6 +96,7 @@ export const HeartbeatRequestSchema = z.object({
   action: z.enum(["lock", "beat", "unlock"]),
   run_id: z.string().optional(),
   session_id: z.string().optional(),
+  parent_run_id: z.string().optional(),
   tool_name: z.string().optional(),
   command: z.string().optional(),
   command_family: z.string().optional(),
@@ -90,8 +104,18 @@ export const HeartbeatRequestSchema = z.object({
   resource_id: z.string().optional(),
   message: z.string().optional(),
   exit_code: z.number().int().optional(),
+  tokens: z.number().int().nonnegative().optional(),
+  cost_usd: z.number().nonnegative().optional(),
+  requires_verification: z.boolean().optional(),
   metadata: z.record(z.string()).optional(),
 });
+
+export const VerifyRequestSchema = z.object({
+  status: z.enum(["passed", "failed"]),
+  message: z.string().optional(),
+});
+
+export type VerifyRequest = z.infer<typeof VerifyRequestSchema>;
 
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequestSchema>;
 
@@ -122,6 +146,48 @@ export interface RunListResponse {
   total: number;
 }
 
+// --- Spend / budgets ---
+
+export interface BudgetMetric {
+  used: number;
+  limit: number | null;
+  pct: number | null;
+  severity: Severity;
+}
+
+export interface BudgetEval {
+  tokens: BudgetMetric;
+  cost_usd: BudgetMetric;
+  severity: Severity;
+}
+
+export interface SpendScope {
+  /** service_name or session_id depending on the grouping */
+  key: string;
+  tokens: number;
+  cost_usd: number;
+  runs: number;
+}
+
+export interface ServiceSpend extends SpendScope {
+  budget_tokens: number | null;
+  budget_usd: number | null;
+  budget: BudgetEval;
+}
+
+export interface SpendResponse {
+  timestamp: string;
+  total: { tokens: number; cost_usd: number; runs: number };
+  services: ServiceSpend[];
+  sessions: SpendScope[];
+}
+
+export interface VerificationSummary {
+  pending: number;
+  passed: number;
+  failed: number;
+}
+
 // --- Configuration ---
 
 export interface ServiceConfig {
@@ -129,6 +195,8 @@ export interface ServiceConfig {
   expected_cycle_ms: number;
   max_silence_ms: number;
   endpoints?: EndpointConfig[];
+  budget_tokens?: number;
+  budget_usd?: number;
 }
 
 export interface EndpointConfig {

@@ -269,6 +269,175 @@ If the upload stalls (large file, flaky connection), you see it go `stale` befor
 
 ---
 
+## 6. Orchestrating Sub-Agents (Dynamic Sub-Threads)
+
+An orchestrator agent breaks a big job — "refactor the API package" — into sub-tasks it spins up dynamically: extract a module, update imports, run the tests. You want a single view of the whole tree and an instant read on whether any branch is stuck, without wiring run IDs through every layer.
+
+### Auto-parenting — no manual wiring
+
+Wrap the orchestrator in `exec`. Every nested `agent-heart` call inside automatically attaches as a child, because `exec` exports the current run id (`AGENT_HEART_RUN_ID`) to the child environment. This works in **any harness** — Claude Code, a bare shell, CI — since they all propagate environment variables to child processes.
+
+```bash
+npx agent-heart exec --service refactor-api --tool orchestrator -- ./refactor.sh
+```
+
+Inside `refactor.sh`, the sub-tasks need no special flags:
+
+```bash
+# These become children of the orchestrator run automatically.
+npx agent-heart exec --service extract-module --tool agent -- ./extract.sh
+npx agent-heart exec --service update-imports --tool agent -- ./update-imports.sh
+npx agent-heart exec --service run-tests --tool vitest -- npm test
+```
+
+For manual lifecycles, pass `--parent <run-id>` (or export `AGENT_HEART_RUN_ID`) to `lock`.
+
+### Seeing the tree
+
+```bash
+npx agent-heart status --tree
+```
+
+```
+  refactor-api    orchestrator  active   1.7s (3 sub)
+  ├─ extract-module  agent    completed  163ms
+  └─ update-imports  agent    active     1.2s (1 sub) ⚠ subtree warning
+     └─ run-tests     vitest   stale      1.1s
+```
+
+A stuck leaf bubbles up: the orchestrator row is annotated `⚠ subtree warning` because `run-tests` went `stale`, so you spot the problem branch from the root without expanding anything. `runs --tree` renders the same way, and `--json` returns the nested structure for an agent loop to act on. A remote orchestrator can also pull a subtree directly: `GET /api/v1/runs/:id/tree`.
+
+---
+
+## 7. A Self-Halting Loop on a Budget
+
+You run a self-prompting agent loop overnight. It's productive — and it burns tokens fast. You want it to stop itself if it crosses a dollar limit rather than waking up to a drained account.
+
+### Set a budget
+
+```json
+// ~/.agent-heart/config.json
+{ "services": [ { "name": "claude", "expected_cycle_ms": 120000, "max_silence_ms": 300000, "budget_usd": 20.00 } ] }
+```
+
+### Report spend each iteration
+
+After each model turn, the agent reports its cumulative tokens and cost (the latest value wins):
+
+```bash
+npx agent-heart beat claude --run-id "$RUN" --tokens "$TOKENS" --cost "$COST"
+```
+
+### Let the loop check itself
+
+At the top of each iteration, the loop asks agent-heart whether it's still within budget. `spend --fail-over-budget` exits non-zero when the service is over budget:
+
+```bash
+while true; do
+  npx agent-heart spend --service claude --fail-over-budget || {
+    echo "Budget reached — stopping the loop."; break;
+  }
+  ./run-one-iteration.sh
+done
+```
+
+### See where the money went
+
+```bash
+npx agent-heart spend
+```
+
+```
+  claude   1.8M   $19.40   $19.40/$20.00 ██████████ 97%   142
+```
+
+The agent manages its own limit — no babysitting, no surprise bill.
+
+---
+
+## 8. Walk Away From a Long Refactor
+
+An agent is refactoring a large codebase overnight. It spawns sub-tasks as it goes — extract modules, update imports, run tests. You don't want to sit watching `status`; you want one command that returns when it's done (or when something dies), and to be paged either way.
+
+### Kick it off, then block on it
+
+```bash
+./start-refactor.sh   # spawns tracked runs under --session nightly-refactor
+
+# One command that blocks until the whole session resolves, with a Slack ping on resolve
+npx agent-heart watch --session nightly-refactor --timeout 14400 --webhook "$SLACK_WEBHOOK"
+echo "exit: $?"   # 0 = all completed, 1 = something failed/died, 124 = timed out
+```
+
+`watch` polls quietly and re-reads the run set each tick, so the sub-tasks the agent spawns mid-run are picked up automatically. When the last run settles, it prints a summary, POSTs the webhook, and exits.
+
+### Branch on the outcome
+
+Because the exit code reflects the result, you can wire the whole thing into a pipeline and go to bed:
+
+```bash
+npx agent-heart watch --session nightly-refactor --timeout 14400 \
+  && ./open-pr.sh \
+  || ./page-me.sh "refactor did not finish cleanly"
+```
+
+### Or just set a death alarm
+
+If you only care about catching a stall or crash:
+
+```bash
+npx agent-heart watch --session nightly-refactor --until dead,stale --webhook "$PAGER"
+```
+
+This returns the instant any run dies or goes stale — so you find out within seconds, not the next morning.
+
+---
+
+## 9. Trust, but Verify (Oversight Gates)
+
+An autonomous agent fixes a bug and marks the work done. But "the agent says it's done" isn't the same as "it's verified." You want a clear separation between *finished* and *trusted*, and a list of anything that finished but hasn't been checked.
+
+### Finish as unverified
+
+The agent ends its run flagged for oversight instead of silently "completed":
+
+```bash
+npx agent-heart unlock fix-auth --run-id "$RUN" --exit-code 0 --needs-verify
+```
+
+`status` now distinguishes finished-and-trusted from finished-but-not-yet:
+
+```bash
+npx agent-heart status
+```
+
+```
+  3 active  0 stale  0 dead  12 completed  1 failed
+  1 awaiting verification
+```
+
+### Record the verdict after a real check
+
+A test run (or a human, or a second reviewer agent) decides:
+
+```bash
+./run-integration-tests.sh \
+  && npx agent-heart verify --run-id "$RUN" --pass \
+  || npx agent-heart verify --run-id "$RUN" --fail --message "auth test regressed"
+```
+
+### A supervisor catches anything unchecked
+
+A background loop makes sure nothing slips through as "done" without oversight:
+
+```
+/loop 5m run npx agent-heart runs --unverified --json and list anything that finished but was never verified
+```
+
+Now "done" means *verified done* — the agent does the work, but trust is gated on a check.
+
+---
+
 ## Naming Convention
 
 Services follow a `<runtime>/<tool_or_family>` pattern:

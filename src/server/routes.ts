@@ -2,12 +2,16 @@ import { Hono } from "hono";
 import {
   HeartbeatRequestSchema,
   HeartbeatAction,
+  VerifyRequestSchema,
 } from "../core/models.js";
 import type {
   HeartbeatResponse,
   OverviewResponse,
   RunListResponse,
+  SpendResponse,
+  ServiceSpend,
 } from "../core/models.js";
+import { evaluateBudget } from "../core/budget.js";
 import type { PulseDB } from "./db.js";
 
 export function createApp(db: PulseDB): Hono {
@@ -90,6 +94,8 @@ export function createApp(db: PulseDB): Hono {
             status: newStatus,
             ...(req.message !== undefined && { message: req.message }),
             ...(req.tool_name !== undefined && { tool_name: req.tool_name }),
+            ...(req.tokens !== undefined && { tokens: req.tokens }),
+            ...(req.cost_usd !== undefined && { cost_usd: req.cost_usd }),
             ...(req.metadata !== undefined && { metadata: req.metadata }),
           });
 
@@ -151,7 +157,12 @@ export function createApp(db: PulseDB): Hono {
             duration_ms: durationMs,
             completed_at: now,
             last_heartbeat: now,
+            ...(req.requires_verification && {
+              verification: "pending" as const,
+            }),
             ...(req.message !== undefined && { message: req.message }),
+            ...(req.tokens !== undefined && { tokens: req.tokens }),
+            ...(req.cost_usd !== undefined && { cost_usd: req.cost_usd }),
             ...(req.metadata !== undefined && { metadata: req.metadata }),
           });
 
@@ -203,6 +214,24 @@ export function createApp(db: PulseDB): Hono {
     }
   });
 
+  // --- Get a run's subtree (root + all descendants) ---
+  app.get("/api/v1/runs/:id/tree", (c) => {
+    try {
+      const runId = c.req.param("id");
+      const runs = db.getRunTree(runId);
+
+      if (runs.length === 0) {
+        return c.json({ ok: false, error: `Run not found: ${runId}` }, 404);
+      }
+
+      const response: RunListResponse = { runs, total: runs.length };
+      return c.json(response);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Internal error";
+      return c.json({ ok: false, error: message }, 500);
+    }
+  });
+
   // --- Get single run ---
   app.get("/api/v1/runs/:id", (c) => {
     try {
@@ -220,6 +249,32 @@ export function createApp(db: PulseDB): Hono {
     }
   });
 
+  // --- Verify a run (oversight: record a pass/fail verdict) ---
+  app.post("/api/v1/runs/:id/verify", async (c) => {
+    try {
+      const runId = c.req.param("id");
+      const body = await c.req.json().catch(() => ({}));
+      const parsed = VerifyRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        return c.json(
+          { ok: false, error: "Invalid request", details: parsed.error.issues },
+          400,
+        );
+      }
+
+      const existing = db.getRun(runId);
+      if (!existing) {
+        return c.json({ ok: false, error: `Run not found: ${runId}` }, 404);
+      }
+
+      const updated = db.verifyRun(runId, parsed.data.status, parsed.data.message);
+      return c.json(updated);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Internal error";
+      return c.json({ ok: false, error: message }, 500);
+    }
+  });
+
   // --- Overview ---
   app.get("/api/v1/overview", (c) => {
     try {
@@ -231,6 +286,44 @@ export function createApp(db: PulseDB): Hono {
         services,
         runs: counts,
         endpoints: [], // Endpoint checks are a future enhancement
+      };
+
+      return c.json(response);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Internal error";
+      return c.json({ ok: false, error: message }, 500);
+    }
+  });
+
+  // --- Spend / budgets ---
+  app.get("/api/v1/spend", (c) => {
+    try {
+      const service = c.req.query("service");
+      const session = c.req.query("session");
+      const spend = db.getSpend({
+        service: service || undefined,
+        session: session || undefined,
+      });
+
+      const services: ServiceSpend[] = spend.services.map((s) => {
+        const cfg = db.getService(s.key);
+        const budget = evaluateBudget(
+          { tokens: s.tokens, cost_usd: s.cost_usd },
+          { tokens: cfg?.budget_tokens, cost_usd: cfg?.budget_usd },
+        );
+        return {
+          ...s,
+          budget_tokens: cfg?.budget_tokens ?? null,
+          budget_usd: cfg?.budget_usd ?? null,
+          budget,
+        };
+      });
+
+      const response: SpendResponse = {
+        timestamp: new Date().toISOString(),
+        total: spend.total,
+        services,
+        sessions: spend.sessions,
       };
 
       return c.json(response);

@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import chalk from "chalk";
 import { PulseClient } from "../../core/client.js";
 import { redactCommand } from "../../utils/redact.js";
+import { PARENT_RUN_ID_ENV, resolveParentRunId } from "../../core/parentage.js";
 import { log, chrome, formatDuration } from "../../utils/logger.js";
 
 const PERMISSION_PATTERNS = [
@@ -25,6 +26,10 @@ export function makeExecCommand(): Command {
     .option("-t, --tool <name>", "Tool name being invoked")
     .option("-r, --resource <kind>", "Resource kind being acted on")
     .option("-s, --session <id>", "Session ID")
+    .option(
+      "--parent <run-id>",
+      `Parent run ID for orchestration trees (defaults to $${PARENT_RUN_ID_ENV})`,
+    )
     .option(
       "--heartbeat-interval <ms>",
       "Heartbeat interval in milliseconds",
@@ -146,11 +151,14 @@ export function makeExecCommand(): Command {
           log.dim(`Executing: ${redactedCommand}`);
         }
 
+        const parentRunId = resolveParentRunId(opts.parent);
+
         const lockResponse = await client.lock(opts.service, {
           tool_name: opts.tool,
           resource_kind: opts.resource,
           command: redactedCommand,
           message: `Executing: ${redactedCommand}`,
+          parent_run_id: parentRunId,
           metadata,
         });
 
@@ -193,7 +201,9 @@ export function makeExecCommand(): Command {
               ? ["inherit", "pipe", "pipe"]
               : ["inherit", "inherit", "inherit"],
             shell: false,
-            env: process.env,
+            // Expose this run as the parent for any nested agent-heart calls,
+            // so dynamically-spawned sub-tasks attach to the tree automatically.
+            env: { ...process.env, [PARENT_RUN_ID_ENV]: runId },
           });
 
           if (captureEnabled) {

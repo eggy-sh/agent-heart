@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { PulseClient } from "../../core/client.js";
+import { PARENT_RUN_ID_ENV, resolveParentRunId } from "../../core/parentage.js";
 import { log } from "../../utils/logger.js";
 
 export function makeLockCommand(): Command {
@@ -10,6 +11,10 @@ export function makeLockCommand(): Command {
     .option("-t, --tool <name>", "Tool name being invoked")
     .option("-r, --resource <kind>", "Resource kind being acted on")
     .option("-m, --message <msg>", "Human-readable message for the lock event")
+    .option(
+      "--parent <run-id>",
+      `Parent run ID for orchestration trees (defaults to $${PARENT_RUN_ID_ENV})`,
+    )
     .option("--metadata <json>", "Additional metadata as JSON string")
     .action(async (service: string, opts) => {
       const parentOpts = lock.parent?.opts() ?? {};
@@ -35,6 +40,7 @@ export function makeLockCommand(): Command {
           tool_name: opts.tool,
           resource_kind: opts.resource,
           message: opts.message,
+          parent_run_id: resolveParentRunId(opts.parent),
           metadata,
         });
 

@@ -21,6 +21,7 @@
 
 ## Phase 4: Operational Views
 
+- Orchestration trees — parent/child runs with subtree health rollup (`status --tree`, `runs --tree`, `GET /runs/:id/tree`) ✅
 - Active sessions dashboard
 - Top failing tools
 - Resource access breakdown

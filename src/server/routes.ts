@@ -203,6 +203,24 @@ export function createApp(db: PulseDB): Hono {
     }
   });
 
+  // --- Get a run's subtree (root + all descendants) ---
+  app.get("/api/v1/runs/:id/tree", (c) => {
+    try {
+      const runId = c.req.param("id");
+      const runs = db.getRunTree(runId);
+
+      if (runs.length === 0) {
+        return c.json({ ok: false, error: `Run not found: ${runId}` }, 404);
+      }
+
+      const response: RunListResponse = { runs, total: runs.length };
+      return c.json(response);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Internal error";
+      return c.json({ ok: false, error: message }, 500);
+    }
+  });
+
   // --- Get single run ---
   app.get("/api/v1/runs/:id", (c) => {
     try {

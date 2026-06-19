@@ -14,6 +14,7 @@ export interface PulseDB {
   createRun(req: HeartbeatRequest): Run;
   updateRun(runId: string, updates: Partial<Run>): Run;
   getRun(runId: string): Run | null;
+  getRunTree(rootId: string): Run[];
   listRuns(filters?: {
     service?: string;
     status?: string;
@@ -42,6 +43,7 @@ export interface PulseDB {
 interface RunRow {
   run_id: string;
   session_id: string | null;
+  parent_run_id: string | null;
   service_name: string;
   tool_name: string | null;
   command: string | null;
@@ -70,6 +72,7 @@ function rowToRun(row: RunRow): Run {
   return {
     run_id: row.run_id,
     session_id: row.session_id,
+    parent_run_id: row.parent_run_id ?? null,
     service_name: row.service_name,
     tool_name: row.tool_name,
     command: row.command,
@@ -109,6 +112,19 @@ function queryAll<T>(db: SqlJsDatabase, sql: string, params?: BindParams): T[] {
   return rows;
 }
 
+/** Add a column to a table if it does not already exist (idempotent migration). */
+function ensureColumn(
+  db: SqlJsDatabase,
+  table: string,
+  column: string,
+  ddlType: string,
+): void {
+  const cols = queryAll<{ name: string }>(db, `PRAGMA table_info(${table})`);
+  if (!cols.some((c) => c.name === column)) {
+    db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddlType}`);
+  }
+}
+
 /** Run a SELECT and return the first matching row as an object */
 function queryOne<T>(db: SqlJsDatabase, sql: string, params?: BindParams): T | undefined {
   const stmt = db.prepare(sql);
@@ -141,6 +157,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
     CREATE TABLE IF NOT EXISTS runs (
       run_id TEXT PRIMARY KEY,
       session_id TEXT,
+      parent_run_id TEXT,
       service_name TEXT NOT NULL,
       tool_name TEXT,
       command TEXT,
@@ -185,6 +202,14 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
     );
   `);
 
+  // Migration: add parent_run_id to databases created before orchestration
+  // trees existed. CREATE TABLE IF NOT EXISTS never alters an existing table,
+  // so older DBs need the column added explicitly before its index is built.
+  ensureColumn(db, "runs", "parent_run_id", "TEXT");
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_runs_parent_run_id ON runs(parent_run_id);`,
+  );
+
   function save(): void {
     const data = db.export();
     writeFileSync(dbPath, Buffer.from(data));
@@ -199,6 +224,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       const run: Run = {
         run_id: nanoid(),
         session_id: req.session_id ?? null,
+        parent_run_id: req.parent_run_id ?? null,
         service_name: req.service_name,
         tool_name: req.tool_name ?? null,
         command: req.command ?? null,
@@ -217,15 +243,16 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       };
 
       db.run(
-        `INSERT INTO runs (run_id, session_id, service_name, tool_name, command, command_family,
+        `INSERT INTO runs (run_id, session_id, parent_run_id, service_name, tool_name, command, command_family,
           resource_kind, resource_id, status, severity, message, exit_code, duration_ms,
           started_at, last_heartbeat, completed_at, metadata)
-        VALUES ($run_id, $session_id, $service_name, $tool_name, $command, $command_family,
+        VALUES ($run_id, $session_id, $parent_run_id, $service_name, $tool_name, $command, $command_family,
           $resource_kind, $resource_id, $status, $severity, $message, $exit_code, $duration_ms,
           $started_at, $last_heartbeat, $completed_at, $metadata)`,
         {
           $run_id: run.run_id,
           $session_id: run.session_id,
+          $parent_run_id: run.parent_run_id,
           $service_name: run.service_name,
           $tool_name: run.tool_name,
           $command: run.command,
@@ -290,6 +317,36 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
         { $run_id: runId } as BindParams,
       );
       return row ? rowToRun(row) : null;
+    },
+
+    getRunTree(rootId: string): Run[] {
+      // Walk the parent->child edges from the root down. `depth` orders the
+      // result root-first; the depth cap bounds recursion on cyclic data.
+      // Rows are ordered shallowest-first, then deduped by run_id in JS so
+      // corrupt cyclic data can never duplicate or reorder the root.
+      const rows = queryAll<RunRow>(db,
+        `WITH RECURSIVE subtree(run_id, depth) AS (
+           SELECT run_id, 0 FROM runs WHERE run_id = $root
+           UNION ALL
+           SELECT r.run_id, s.depth + 1
+             FROM runs r
+             JOIN subtree s ON r.parent_run_id = s.run_id
+            WHERE s.depth < 64
+         )
+         SELECT r.* FROM runs r
+           JOIN subtree s ON r.run_id = s.run_id
+          ORDER BY s.depth ASC, r.started_at ASC`,
+        { $root: rootId } as BindParams,
+      );
+
+      const seen = new Set<string>();
+      const result: Run[] = [];
+      for (const row of rows) {
+        if (seen.has(row.run_id)) continue;
+        seen.add(row.run_id);
+        result.push(rowToRun(row));
+      }
+      return result;
     },
 
     listRuns(filters?: {

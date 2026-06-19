@@ -355,6 +355,44 @@ The agent manages its own limit — no babysitting, no surprise bill.
 
 ---
 
+## 8. Walk Away From a Long Refactor
+
+An agent is refactoring a large codebase overnight. It spawns sub-tasks as it goes — extract modules, update imports, run tests. You don't want to sit watching `status`; you want one command that returns when it's done (or when something dies), and to be paged either way.
+
+### Kick it off, then block on it
+
+```bash
+./start-refactor.sh   # spawns tracked runs under --session nightly-refactor
+
+# One command that blocks until the whole session resolves, with a Slack ping on resolve
+npx agent-heart watch --session nightly-refactor --timeout 14400 --webhook "$SLACK_WEBHOOK"
+echo "exit: $?"   # 0 = all completed, 1 = something failed/died, 124 = timed out
+```
+
+`watch` polls quietly and re-reads the run set each tick, so the sub-tasks the agent spawns mid-run are picked up automatically. When the last run settles, it prints a summary, POSTs the webhook, and exits.
+
+### Branch on the outcome
+
+Because the exit code reflects the result, you can wire the whole thing into a pipeline and go to bed:
+
+```bash
+npx agent-heart watch --session nightly-refactor --timeout 14400 \
+  && ./open-pr.sh \
+  || ./page-me.sh "refactor did not finish cleanly"
+```
+
+### Or just set a death alarm
+
+If you only care about catching a stall or crash:
+
+```bash
+npx agent-heart watch --session nightly-refactor --until dead,stale --webhook "$PAGER"
+```
+
+This returns the instant any run dies or goes stale — so you find out within seconds, not the next morning.
+
+---
+
 ## Naming Convention
 
 Services follow a `<runtime>/<tool_or_family>` pattern:

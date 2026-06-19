@@ -23,6 +23,7 @@
 ## Phase 4: Operational Views
 
 - Orchestration trees — parent/child runs with subtree health rollup (`status --tree`, `runs --tree`, `GET /runs/:id/tree`) ✅
+- `watch` — block until runs resolve, with exit codes and webhook notify (the heartbeat "walk away" pattern) ✅
 - Active sessions dashboard
 - Top failing tools
 - Resource access breakdown

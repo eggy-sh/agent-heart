@@ -104,6 +104,17 @@ export class PulseClient {
     return this.request<RunListResponse>(`/api/v1/runs/${runId}/tree`);
   }
 
+  /** Like getRun, but returns null for a missing run (404) instead of throwing,
+   *  so callers can tell "not found" apart from a real connection failure. */
+  async getRunOrNull(runId: string): Promise<Run | null> {
+    try {
+      return await this.getRun(runId);
+    } catch (err) {
+      if (err instanceof Error && /\bHTTP 404\b/.test(err.message)) return null;
+      throw err;
+    }
+  }
+
   async listRuns(params?: {
     service?: string;
     status?: string;

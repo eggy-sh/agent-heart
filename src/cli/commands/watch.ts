@@ -119,28 +119,40 @@ export function makeWatchCommand(): Command {
       }
 
       const until: RunStatus[] | null = opts.until ?? null;
-      const intervalMs = (opts.interval ?? 2) * 1000;
+      // Floor the poll interval so `--interval 0` can't spin a hot loop.
+      const intervalMs = Math.max((opts.interval ?? 2) * 1000, 250);
       const timeoutMs = (opts.timeout ?? 0) * 1000;
       const client = new PulseClient({ serverUrl: parentOpts.server });
       const start = Date.now();
 
-      const fetchRuns = async (): Promise<Run[]> => {
-        if (opts.runId) {
-          const r = await client.getRun(opts.runId);
-          return r ? [r] : [];
-        }
-        const res = await client.listRuns({
-          service: opts.service,
-          session_id: opts.session,
-          limit: 500,
-        });
-        return res.runs;
-      };
-
       for (;;) {
         let runs: Run[] = [];
         try {
-          runs = await fetchRuns();
+          if (opts.runId) {
+            const r = await client.getRunOrNull(opts.runId);
+            if (r === null) {
+              // A watched run id that doesn't exist is a user error, not a
+              // thing to wait on — fail fast rather than poll until timeout.
+              if (jsonOutput) {
+                log.json({
+                  resolved: false,
+                  exit_code: 2,
+                  reason: `run not found: ${opts.runId}`,
+                });
+              } else {
+                log.error(`Run not found: ${opts.runId}`);
+              }
+              process.exit(2);
+            }
+            runs = [r];
+          } else {
+            const res = await client.listRuns({
+              service: opts.service,
+              session_id: opts.session,
+              limit: 500,
+            });
+            runs = res.runs;
+          }
         } catch (error) {
           // A transient fetch failure shouldn't abort a long watch.
           if (!jsonOutput) {

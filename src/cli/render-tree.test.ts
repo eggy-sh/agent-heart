@@ -34,6 +34,7 @@ function makeRun(
     duration_ms: 100,
     tokens: null,
     cost_usd: null,
+    verification: null,
     started_at: "2026-06-18T00:00:00.000Z",
     last_heartbeat: "2026-06-18T00:00:00.000Z",
     completed_at: null,

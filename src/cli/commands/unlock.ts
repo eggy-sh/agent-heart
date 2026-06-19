@@ -17,6 +17,10 @@ export function makeUnlockCommand(): Command {
     .option("-m, --message <msg>", "Completion message")
     .option("--tokens <n>", "Total tokens used by this run", parseIntArg)
     .option("--cost <usd>", "Total cost (USD) of this run", parseFloatArg)
+    .option(
+      "--needs-verify",
+      "Mark the run completed-but-unverified (awaiting oversight)",
+    )
     .action(async (service: string, opts) => {
       const parentOpts = unlock.parent?.opts() ?? {};
       const jsonOutput = parentOpts.json === true;
@@ -33,6 +37,7 @@ export function makeUnlockCommand(): Command {
           message: opts.message,
           ...(opts.tokens !== undefined && { tokens: opts.tokens }),
           ...(opts.cost !== undefined && { cost_usd: opts.cost }),
+          ...(opts.needsVerify && { requires_verification: true }),
         });
 
         if (jsonOutput) {

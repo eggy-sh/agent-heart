@@ -13,6 +13,7 @@
 - Duration and failure categorization
 - Stale/dead classification tuning
 - Token/cost spend tracking with per-service budgets and self-halt (`spend --fail-over-budget`) ✅
+- Verification gates — completed-but-unverified runs with a `verify` oversight verdict ✅
 
 ## Phase 3: Hook Integrations
 

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import {
   HeartbeatRequestSchema,
   HeartbeatAction,
+  VerifyRequestSchema,
 } from "../core/models.js";
 import type {
   HeartbeatResponse,
@@ -156,6 +157,9 @@ export function createApp(db: PulseDB): Hono {
             duration_ms: durationMs,
             completed_at: now,
             last_heartbeat: now,
+            ...(req.requires_verification && {
+              verification: "pending" as const,
+            }),
             ...(req.message !== undefined && { message: req.message }),
             ...(req.tokens !== undefined && { tokens: req.tokens }),
             ...(req.cost_usd !== undefined && { cost_usd: req.cost_usd }),
@@ -239,6 +243,32 @@ export function createApp(db: PulseDB): Hono {
       }
 
       return c.json(run);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Internal error";
+      return c.json({ ok: false, error: message }, 500);
+    }
+  });
+
+  // --- Verify a run (oversight: record a pass/fail verdict) ---
+  app.post("/api/v1/runs/:id/verify", async (c) => {
+    try {
+      const runId = c.req.param("id");
+      const body = await c.req.json().catch(() => ({}));
+      const parsed = VerifyRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        return c.json(
+          { ok: false, error: "Invalid request", details: parsed.error.issues },
+          400,
+        );
+      }
+
+      const existing = db.getRun(runId);
+      if (!existing) {
+        return c.json({ ok: false, error: `Run not found: ${runId}` }, 404);
+      }
+
+      const updated = db.verifyRun(runId, parsed.data.status, parsed.data.message);
+      return c.json(updated);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Internal error";
       return c.json({ ok: false, error: message }, 500);

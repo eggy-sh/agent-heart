@@ -393,6 +393,51 @@ This returns the instant any run dies or goes stale — so you find out within s
 
 ---
 
+## 9. Trust, but Verify (Oversight Gates)
+
+An autonomous agent fixes a bug and marks the work done. But "the agent says it's done" isn't the same as "it's verified." You want a clear separation between *finished* and *trusted*, and a list of anything that finished but hasn't been checked.
+
+### Finish as unverified
+
+The agent ends its run flagged for oversight instead of silently "completed":
+
+```bash
+npx agent-heart unlock fix-auth --run-id "$RUN" --exit-code 0 --needs-verify
+```
+
+`status` now distinguishes finished-and-trusted from finished-but-not-yet:
+
+```bash
+npx agent-heart status
+```
+
+```
+  3 active  0 stale  0 dead  12 completed  1 failed
+  1 awaiting verification
+```
+
+### Record the verdict after a real check
+
+A test run (or a human, or a second reviewer agent) decides:
+
+```bash
+./run-integration-tests.sh \
+  && npx agent-heart verify --run-id "$RUN" --pass \
+  || npx agent-heart verify --run-id "$RUN" --fail --message "auth test regressed"
+```
+
+### A supervisor catches anything unchecked
+
+A background loop makes sure nothing slips through as "done" without oversight:
+
+```
+/loop 5m run npx agent-heart runs --unverified --json and list anything that finished but was never verified
+```
+
+Now "done" means *verified done* — the agent does the work, but trust is gated on a check.
+
+---
+
 ## Naming Convention
 
 Services follow a `<runtime>/<tool_or_family>` pattern:

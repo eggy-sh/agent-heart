@@ -8,6 +8,7 @@ import type {
   ServiceState,
   ServiceConfig,
   HeartbeatRequest,
+  VerificationStatus,
 } from "../core/models.js";
 
 export interface PulseDB {
@@ -15,6 +16,7 @@ export interface PulseDB {
   updateRun(runId: string, updates: Partial<Run>): Run;
   getRun(runId: string): Run | null;
   getRunTree(rootId: string): Run[];
+  verifyRun(runId: string, status: VerificationStatus, message?: string): Run;
   listRuns(filters?: {
     service?: string;
     status?: string;
@@ -62,6 +64,7 @@ interface RunRow {
   duration_ms: number | null;
   tokens: number | null;
   cost_usd: number | null;
+  verification: string | null;
   started_at: string;
   last_heartbeat: string;
   completed_at: string | null;
@@ -95,6 +98,7 @@ function rowToRun(row: RunRow): Run {
     duration_ms: row.duration_ms,
     tokens: row.tokens ?? null,
     cost_usd: row.cost_usd ?? null,
+    verification: (row.verification as Run["verification"]) ?? null,
     started_at: row.started_at,
     last_heartbeat: row.last_heartbeat,
     completed_at: row.completed_at,
@@ -184,6 +188,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       duration_ms INTEGER,
       tokens INTEGER,
       cost_usd REAL,
+      verification TEXT,
       started_at TEXT NOT NULL,
       last_heartbeat TEXT NOT NULL,
       completed_at TEXT,
@@ -229,6 +234,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
   ensureColumn(db, "runs", "cost_usd", "REAL");
   ensureColumn(db, "services", "budget_tokens", "INTEGER");
   ensureColumn(db, "services", "budget_usd", "REAL");
+  ensureColumn(db, "runs", "verification", "TEXT");
 
   function save(): void {
     const data = db.export();
@@ -258,6 +264,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
         duration_ms: null,
         tokens: req.tokens ?? null,
         cost_usd: req.cost_usd ?? null,
+        verification: null,
         started_at: now,
         last_heartbeat: now,
         completed_at: null,
@@ -267,10 +274,10 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       db.run(
         `INSERT INTO runs (run_id, session_id, parent_run_id, service_name, tool_name, command, command_family,
           resource_kind, resource_id, status, severity, message, exit_code, duration_ms,
-          tokens, cost_usd, started_at, last_heartbeat, completed_at, metadata)
+          tokens, cost_usd, verification, started_at, last_heartbeat, completed_at, metadata)
         VALUES ($run_id, $session_id, $parent_run_id, $service_name, $tool_name, $command, $command_family,
           $resource_kind, $resource_id, $status, $severity, $message, $exit_code, $duration_ms,
-          $tokens, $cost_usd, $started_at, $last_heartbeat, $completed_at, $metadata)`,
+          $tokens, $cost_usd, $verification, $started_at, $last_heartbeat, $completed_at, $metadata)`,
         {
           $run_id: run.run_id,
           $session_id: run.session_id,
@@ -288,6 +295,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
           $duration_ms: run.duration_ms,
           $tokens: run.tokens,
           $cost_usd: run.cost_usd,
+          $verification: run.verification,
           $started_at: run.started_at,
           $last_heartbeat: run.last_heartbeat,
           $completed_at: run.completed_at,
@@ -371,6 +379,30 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
         result.push(rowToRun(row));
       }
       return result;
+    },
+
+    verifyRun(runId: string, status: VerificationStatus, message?: string): Run {
+      const existing = queryOne<RunRow>(db,
+        `SELECT run_id FROM runs WHERE run_id = $id`,
+        { $id: runId } as BindParams,
+      );
+      if (!existing) {
+        throw new Error(`Run not found: ${runId}`);
+      }
+      db.run(
+        `UPDATE runs SET verification = $v${message !== undefined ? ", message = $m" : ""} WHERE run_id = $id`,
+        {
+          $v: status,
+          $id: runId,
+          ...(message !== undefined ? { $m: message } : {}),
+        } as BindParams,
+      );
+      save();
+      const updated = queryOne<RunRow>(db,
+        `SELECT * FROM runs WHERE run_id = $id`,
+        { $id: runId } as BindParams,
+      );
+      return rowToRun(updated!);
     },
 
     listRuns(filters?: {

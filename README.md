@@ -48,6 +48,8 @@ That is the gap `agent-heart` is built to fill.
 
 **Walk away and get told** -- `npx agent-heart watch` blocks until your background work resolves (everything finished, or something died), then exits with a status-reflecting code and can fire a webhook. Orchestrate long-running work without babysitting a polling loop.
 
+**Verification gates** -- a run finishing isn't the same as a run being trusted. Mark work `completed-but-unverified` (`unlock --needs-verify`), then record an oversight verdict with `verify` after tests/self-review pass. `status` shows what's still awaiting review.
+
 **Universal CLI wrapper** -- wrap any command with `npx agent-heart exec` and get automatic lifecycle tracking, duration capture, and exit code recording. No code changes required.
 
 ```
@@ -214,6 +216,34 @@ npx agent-heart watch --session refactor --timeout 1800 && ./ship.sh || ./page-m
 ```
 
 The watched set is re-read each tick, so sub-tasks an orchestrator spawns mid-watch are included. `--json` emits the final verdict for an agent loop; `evaluateWatch(runs, until)` is exported from the package root for custom waiters.
+
+### `verify` -- Oversight Gates
+
+When an agent marks its own work complete, "completed" doesn't mean "verified." Gate trust on an explicit check: finish the run as **completed-but-unverified**, then record a verdict once tests or a review pass.
+
+```bash
+# The agent finishes its work but flags it for oversight
+npx agent-heart unlock build --run-id run_k7xPm2 --exit-code 0 --needs-verify
+
+# What still needs review?
+npx agent-heart status                 # "1 awaiting verification"
+npx agent-heart runs --unverified      # list just those runs
+
+# Record the verdict after tests / self-review
+npx agent-heart verify --run-id run_k7xPm2 --pass
+npx agent-heart verify --run-id run_k7xPm2 --fail --message "integration tests red"
+```
+
+A loop can gate on it — only ship work that's been verified:
+
+```bash
+./agent-does-the-work.sh              # ends with unlock --needs-verify
+./run-tests.sh && npx agent-heart verify --run-id "$RUN" --pass \
+              || npx agent-heart verify --run-id "$RUN" --fail
+# A supervisor sees anything still pending via: agent-heart runs --unverified --json
+```
+
+SDK: `client.verify(runId, { status, message })`, plus `summarizeVerification(runs)` from the package root.
 
 ### `server start` / `init`
 

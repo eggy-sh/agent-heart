@@ -115,6 +115,17 @@ export class PulseClient {
     }
   }
 
+  /** Record an oversight verdict on a run (passed/failed). */
+  async verify(
+    runId: string,
+    body: { status: "passed" | "failed"; message?: string },
+  ): Promise<Run> {
+    return this.request<Run>(`/api/v1/runs/${runId}/verify`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
   async listRuns(params?: {
     service?: string;
     status?: string;

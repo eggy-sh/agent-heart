@@ -42,6 +42,14 @@ That is the gap `agent-heart` is built to fill.
 
 **Silent failure detection** -- if a run stops sending heartbeats entirely, it is marked `dead`. No more silent disappearances.
 
+**Orchestration trees** -- when an agent spins up sub-tasks, they form a parent/child tree. `status --tree` shows the whole hierarchy and bubbles a stuck or dead leaf up to the root. Sub-tasks attach automatically in any harness -- no run-id wiring.
+
+**Cost & token budgets** -- report tokens and dollars per run, see spend rolled up per session and service, set budgets, and let a loop **self-halt** when it crosses a limit (`spend --fail-over-budget` exits non-zero). Autonomous loops burn tokens fast; this keeps them on a leash.
+
+**Walk away and get told** -- `npx agent-heart watch` blocks until your background work resolves (everything finished, or something died), then exits with a status-reflecting code and can fire a webhook. Orchestrate long-running work without babysitting a polling loop.
+
+**Verification gates** -- a run finishing isn't the same as a run being trusted. Mark work `completed-but-unverified` (`unlock --needs-verify`), then record an oversight verdict with `verify` after tests/self-review pass. `status` shows what's still awaiting review.
+
 **Universal CLI wrapper** -- wrap any command with `npx agent-heart exec` and get automatic lifecycle tracking, duration capture, and exit code recording. No code changes required.
 
 ```
@@ -119,7 +127,123 @@ npx agent-heart status                      # all runs
 npx agent-heart status --service github      # filter by service
 npx agent-heart status --filter stale,dead   # only problems
 npx agent-heart status --json                # pipe to jq
+npx agent-heart status --tree                # render parent → child runs
 ```
+
+### Orchestration Trees -- Dynamic Sub-Threads
+
+When an orchestrator agent spins up sub-tasks, each one can attach to its parent, forming a tree. The killer part is that it requires **no wiring**: `exec` exports the current run id as `AGENT_HEART_RUN_ID`, and every nested `agent-heart` call picks it up as its parent. Because every harness propagates environment variables to child processes, this works the same in Claude Code, a bare shell, or CI.
+
+```bash
+# Wrap the orchestrator — nested agent-heart calls become children automatically
+npx agent-heart exec --service refactor-api --tool orchestrator -- ./refactor.sh
+
+# Manual lifecycles can attach explicitly
+npx agent-heart lock build --parent run_k7xPm2
+```
+
+```bash
+npx agent-heart status --tree
+```
+
+```
+  refactor-api    orchestrator  active   1.7s (3 sub)
+  ├─ extract-module  agent    completed  163ms
+  └─ update-imports  agent    active     1.2s (1 sub) ⚠ subtree warning
+     └─ run-tests     vitest   stale      1.1s
+```
+
+A stuck or dead leaf bubbles a `⚠ subtree` annotation up to the root, so one glance tells you which branch is in trouble. `runs --tree` renders the same way; `--json` returns the nested structure for an agent loop to act on. Remote callers can pull a subtree via `GET /api/v1/runs/:id/tree`, and SDK users get `client.getRunTree(runId)` plus the pure `buildRunForest(runs)` helper.
+
+### `spend` -- Cost & Token Budgets
+
+Autonomous loops burn tokens far faster than hand-prompting. Report usage as the agent works, then watch spend and cap it.
+
+```bash
+# Report cumulative tokens/cost as the run progresses (latest value wins)
+npx agent-heart beat claude --run-id run_k7xPm2 --tokens 180000 --cost 0.70
+npx agent-heart unlock claude --run-id run_k7xPm2 --tokens 240000 --cost 0.95 --exit-code 0
+```
+
+Set budgets per service in `~/.agent-heart/config.json`:
+
+```json
+{ "services": [ { "name": "claude", "expected_cycle_ms": 120000, "max_silence_ms": 300000, "budget_usd": 5.00, "budget_tokens": 2000000 } ] }
+```
+
+```bash
+npx agent-heart spend                  # spend per service + session, with budget bars
+npx agent-heart spend --session loop-1  # one loop's spend
+npx agent-heart spend --json            # machine-readable, includes over_budget[]
+```
+
+```
+  claude   330.0k   $1.25   $1.25/$1.00 ██████████ 125%   2
+  cheap    5.0k     $0.05   $0.05/$10.00 ░░░░░░░░░░ 1%     1
+```
+
+**Self-halting loops** — `spend --fail-over-budget` exits non-zero when any shown service is over budget, so the loop stops itself instead of draining the account:
+
+```bash
+# Inside an agent loop: stop early if we've blown the budget
+npx agent-heart spend --service claude --fail-over-budget || exit 0
+```
+
+SDK: `client.spend({ service, session })`, plus the pure `evaluateBudget(used, limit)` / `isOverBudget(eval)` helpers exported from the package root.
+
+### `watch` -- Walk Away
+
+The heartbeat pattern: instead of busy-polling `status` in a loop, block on one command that returns the moment your background work resolves. The exit code tells you the outcome, so a script or agent loop can branch on it.
+
+```bash
+# Block until every run in a session settles. Exit 0 if all completed, 1 if any failed/died.
+npx agent-heart watch --session deploy-v2.3.1
+
+# Death alarm: return the instant a run dies or stalls
+npx agent-heart watch --service refactor --until dead,stale
+
+# Walk away with a timeout and a notification
+npx agent-heart watch --session overnight-refactor --timeout 3600 --webhook "$SLACK_WEBHOOK"
+```
+
+Exit codes: **0** all relevant runs completed cleanly · **1** resolved but something failed/died · **124** timed out (like `timeout(1)`) · **2** no scope given.
+
+Compose it straight into a pipeline — kick off background work, then block on it:
+
+```bash
+./start-refactor.sh                                  # spawns tracked runs in session "refactor"
+npx agent-heart watch --session refactor --timeout 1800 && ./ship.sh || ./page-me.sh
+```
+
+The watched set is re-read each tick, so sub-tasks an orchestrator spawns mid-watch are included. `--json` emits the final verdict for an agent loop; `evaluateWatch(runs, until)` is exported from the package root for custom waiters.
+
+### `verify` -- Oversight Gates
+
+When an agent marks its own work complete, "completed" doesn't mean "verified." Gate trust on an explicit check: finish the run as **completed-but-unverified**, then record a verdict once tests or a review pass.
+
+```bash
+# The agent finishes its work but flags it for oversight
+npx agent-heart unlock build --run-id run_k7xPm2 --exit-code 0 --needs-verify
+
+# What still needs review?
+npx agent-heart status                 # "1 awaiting verification"
+npx agent-heart runs --unverified      # list just those runs
+
+# Record the verdict after tests / self-review
+npx agent-heart verify --run-id run_k7xPm2 --pass
+npx agent-heart verify --run-id run_k7xPm2 --fail --message "integration tests red"
+```
+
+A loop can gate on it — only ship work that's been verified:
+
+```bash
+./agent-does-the-work.sh              # ends with unlock --needs-verify
+./run-tests.sh && npx agent-heart verify --run-id "$RUN" --pass \
+              || npx agent-heart verify --run-id "$RUN" --fail
+# A supervisor sees anything still pending via: agent-heart runs --unverified --json
+```
+
+SDK: `client.verify(runId, { status, message })`, plus `summarizeVerification(runs)` from the package root.
 
 ### `server start` / `init`
 

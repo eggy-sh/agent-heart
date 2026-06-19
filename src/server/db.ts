@@ -8,12 +8,15 @@ import type {
   ServiceState,
   ServiceConfig,
   HeartbeatRequest,
+  VerificationStatus,
 } from "../core/models.js";
 
 export interface PulseDB {
   createRun(req: HeartbeatRequest): Run;
   updateRun(runId: string, updates: Partial<Run>): Run;
   getRun(runId: string): Run | null;
+  getRunTree(rootId: string): Run[];
+  verifyRun(runId: string, status: VerificationStatus, message?: string): Run;
   listRuns(filters?: {
     service?: string;
     status?: string;
@@ -36,12 +39,18 @@ export interface PulseDB {
   upsertService(config: ServiceConfig): void;
   getRecentRuns(serviceName: string, limit: number): Run[];
   getService(name: string): ServiceConfig | null;
+  getSpend(filters?: { service?: string; session?: string }): {
+    services: { key: string; tokens: number; cost_usd: number; runs: number }[];
+    sessions: { key: string; tokens: number; cost_usd: number; runs: number }[];
+    total: { tokens: number; cost_usd: number; runs: number };
+  };
   close(): void;
 }
 
 interface RunRow {
   run_id: string;
   session_id: string | null;
+  parent_run_id: string | null;
   service_name: string;
   tool_name: string | null;
   command: string | null;
@@ -53,6 +62,9 @@ interface RunRow {
   message: string | null;
   exit_code: number | null;
   duration_ms: number | null;
+  tokens: number | null;
+  cost_usd: number | null;
+  verification: string | null;
   started_at: string;
   last_heartbeat: string;
   completed_at: string | null;
@@ -64,12 +76,15 @@ interface ServiceRow {
   expected_cycle_ms: number;
   max_silence_ms: number;
   endpoints: string;
+  budget_tokens: number | null;
+  budget_usd: number | null;
 }
 
 function rowToRun(row: RunRow): Run {
   return {
     run_id: row.run_id,
     session_id: row.session_id,
+    parent_run_id: row.parent_run_id ?? null,
     service_name: row.service_name,
     tool_name: row.tool_name,
     command: row.command,
@@ -81,6 +96,9 @@ function rowToRun(row: RunRow): Run {
     message: row.message,
     exit_code: row.exit_code,
     duration_ms: row.duration_ms,
+    tokens: row.tokens ?? null,
+    cost_usd: row.cost_usd ?? null,
+    verification: (row.verification as Run["verification"]) ?? null,
     started_at: row.started_at,
     last_heartbeat: row.last_heartbeat,
     completed_at: row.completed_at,
@@ -94,6 +112,8 @@ function rowToServiceConfig(row: ServiceRow): ServiceConfig {
     expected_cycle_ms: row.expected_cycle_ms,
     max_silence_ms: row.max_silence_ms,
     endpoints: JSON.parse(row.endpoints || "[]"),
+    budget_tokens: row.budget_tokens ?? undefined,
+    budget_usd: row.budget_usd ?? undefined,
   };
 }
 
@@ -107,6 +127,19 @@ function queryAll<T>(db: SqlJsDatabase, sql: string, params?: BindParams): T[] {
   }
   stmt.free();
   return rows;
+}
+
+/** Add a column to a table if it does not already exist (idempotent migration). */
+function ensureColumn(
+  db: SqlJsDatabase,
+  table: string,
+  column: string,
+  ddlType: string,
+): void {
+  const cols = queryAll<{ name: string }>(db, `PRAGMA table_info(${table})`);
+  if (!cols.some((c) => c.name === column)) {
+    db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddlType}`);
+  }
 }
 
 /** Run a SELECT and return the first matching row as an object */
@@ -141,6 +174,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
     CREATE TABLE IF NOT EXISTS runs (
       run_id TEXT PRIMARY KEY,
       session_id TEXT,
+      parent_run_id TEXT,
       service_name TEXT NOT NULL,
       tool_name TEXT,
       command TEXT,
@@ -152,6 +186,9 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       message TEXT,
       exit_code INTEGER,
       duration_ms INTEGER,
+      tokens INTEGER,
+      cost_usd REAL,
+      verification TEXT,
       started_at TEXT NOT NULL,
       last_heartbeat TEXT NOT NULL,
       completed_at TEXT,
@@ -167,7 +204,9 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       name TEXT PRIMARY KEY,
       expected_cycle_ms INTEGER NOT NULL,
       max_silence_ms INTEGER NOT NULL,
-      endpoints TEXT NOT NULL DEFAULT '[]'
+      endpoints TEXT NOT NULL DEFAULT '[]',
+      budget_tokens INTEGER,
+      budget_usd REAL
     );
 
     CREATE TABLE IF NOT EXISTS endpoints (
@@ -185,6 +224,18 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
     );
   `);
 
+  // Migrations: add columns to databases created before these features.
+  // CREATE TABLE IF NOT EXISTS never alters an existing table.
+  ensureColumn(db, "runs", "parent_run_id", "TEXT");
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_runs_parent_run_id ON runs(parent_run_id);`,
+  );
+  ensureColumn(db, "runs", "tokens", "INTEGER");
+  ensureColumn(db, "runs", "cost_usd", "REAL");
+  ensureColumn(db, "services", "budget_tokens", "INTEGER");
+  ensureColumn(db, "services", "budget_usd", "REAL");
+  ensureColumn(db, "runs", "verification", "TEXT");
+
   function save(): void {
     const data = db.export();
     writeFileSync(dbPath, Buffer.from(data));
@@ -199,6 +250,7 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       const run: Run = {
         run_id: nanoid(),
         session_id: req.session_id ?? null,
+        parent_run_id: req.parent_run_id ?? null,
         service_name: req.service_name,
         tool_name: req.tool_name ?? null,
         command: req.command ?? null,
@@ -210,6 +262,9 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
         message: req.message ?? null,
         exit_code: null,
         duration_ms: null,
+        tokens: req.tokens ?? null,
+        cost_usd: req.cost_usd ?? null,
+        verification: null,
         started_at: now,
         last_heartbeat: now,
         completed_at: null,
@@ -217,15 +272,16 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
       };
 
       db.run(
-        `INSERT INTO runs (run_id, session_id, service_name, tool_name, command, command_family,
+        `INSERT INTO runs (run_id, session_id, parent_run_id, service_name, tool_name, command, command_family,
           resource_kind, resource_id, status, severity, message, exit_code, duration_ms,
-          started_at, last_heartbeat, completed_at, metadata)
-        VALUES ($run_id, $session_id, $service_name, $tool_name, $command, $command_family,
+          tokens, cost_usd, verification, started_at, last_heartbeat, completed_at, metadata)
+        VALUES ($run_id, $session_id, $parent_run_id, $service_name, $tool_name, $command, $command_family,
           $resource_kind, $resource_id, $status, $severity, $message, $exit_code, $duration_ms,
-          $started_at, $last_heartbeat, $completed_at, $metadata)`,
+          $tokens, $cost_usd, $verification, $started_at, $last_heartbeat, $completed_at, $metadata)`,
         {
           $run_id: run.run_id,
           $session_id: run.session_id,
+          $parent_run_id: run.parent_run_id,
           $service_name: run.service_name,
           $tool_name: run.tool_name,
           $command: run.command,
@@ -237,6 +293,9 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
           $message: run.message,
           $exit_code: run.exit_code,
           $duration_ms: run.duration_ms,
+          $tokens: run.tokens,
+          $cost_usd: run.cost_usd,
+          $verification: run.verification,
           $started_at: run.started_at,
           $last_heartbeat: run.last_heartbeat,
           $completed_at: run.completed_at,
@@ -290,6 +349,60 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
         { $run_id: runId } as BindParams,
       );
       return row ? rowToRun(row) : null;
+    },
+
+    getRunTree(rootId: string): Run[] {
+      // Walk the parent->child edges from the root down. `depth` orders the
+      // result root-first; the depth cap bounds recursion on cyclic data.
+      // Rows are ordered shallowest-first, then deduped by run_id in JS so
+      // corrupt cyclic data can never duplicate or reorder the root.
+      const rows = queryAll<RunRow>(db,
+        `WITH RECURSIVE subtree(run_id, depth) AS (
+           SELECT run_id, 0 FROM runs WHERE run_id = $root
+           UNION ALL
+           SELECT r.run_id, s.depth + 1
+             FROM runs r
+             JOIN subtree s ON r.parent_run_id = s.run_id
+            WHERE s.depth < 64
+         )
+         SELECT r.* FROM runs r
+           JOIN subtree s ON r.run_id = s.run_id
+          ORDER BY s.depth ASC, r.started_at ASC`,
+        { $root: rootId } as BindParams,
+      );
+
+      const seen = new Set<string>();
+      const result: Run[] = [];
+      for (const row of rows) {
+        if (seen.has(row.run_id)) continue;
+        seen.add(row.run_id);
+        result.push(rowToRun(row));
+      }
+      return result;
+    },
+
+    verifyRun(runId: string, status: VerificationStatus, message?: string): Run {
+      const existing = queryOne<RunRow>(db,
+        `SELECT run_id FROM runs WHERE run_id = $id`,
+        { $id: runId } as BindParams,
+      );
+      if (!existing) {
+        throw new Error(`Run not found: ${runId}`);
+      }
+      db.run(
+        `UPDATE runs SET verification = $v${message !== undefined ? ", message = $m" : ""} WHERE run_id = $id`,
+        {
+          $v: status,
+          $id: runId,
+          ...(message !== undefined ? { $m: message } : {}),
+        } as BindParams,
+      );
+      save();
+      const updated = queryOne<RunRow>(db,
+        `SELECT * FROM runs WHERE run_id = $id`,
+        { $id: runId } as BindParams,
+      );
+      return rowToRun(updated!);
     },
 
     listRuns(filters?: {
@@ -498,17 +611,21 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
 
     upsertService(config: ServiceConfig): void {
       db.run(
-        `INSERT INTO services (name, expected_cycle_ms, max_silence_ms, endpoints)
-        VALUES ($name, $expected_cycle_ms, $max_silence_ms, $endpoints)
+        `INSERT INTO services (name, expected_cycle_ms, max_silence_ms, endpoints, budget_tokens, budget_usd)
+        VALUES ($name, $expected_cycle_ms, $max_silence_ms, $endpoints, $budget_tokens, $budget_usd)
         ON CONFLICT(name) DO UPDATE SET
           expected_cycle_ms = $expected_cycle_ms,
           max_silence_ms = $max_silence_ms,
-          endpoints = $endpoints`,
+          endpoints = $endpoints,
+          budget_tokens = $budget_tokens,
+          budget_usd = $budget_usd`,
         {
           $name: config.name,
           $expected_cycle_ms: config.expected_cycle_ms,
           $max_silence_ms: config.max_silence_ms,
           $endpoints: JSON.stringify(config.endpoints ?? []),
+          $budget_tokens: config.budget_tokens ?? null,
+          $budget_usd: config.budget_usd ?? null,
         } as BindParams,
       );
       save();
@@ -520,6 +637,59 @@ export async function createDatabase(dbPath: string): Promise<PulseDB> {
         { $name: name } as BindParams,
       );
       return row ? rowToServiceConfig(row) : null;
+    },
+
+    getSpend(filters?: { service?: string; session?: string }): {
+      services: { key: string; tokens: number; cost_usd: number; runs: number }[];
+      sessions: { key: string; tokens: number; cost_usd: number; runs: number }[];
+      total: { tokens: number; cost_usd: number; runs: number };
+    } {
+      const conditions: string[] = [];
+      const params: Record<string, unknown> = {};
+      if (filters?.service) {
+        conditions.push("service_name = $service");
+        params.$service = filters.service;
+      }
+      if (filters?.session) {
+        conditions.push("session_id = $session");
+        params.$session = filters.session;
+      }
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      const services = queryAll<{ key: string; tokens: number; cost_usd: number; runs: number }>(
+        db,
+        `SELECT service_name AS key,
+                COALESCE(SUM(tokens), 0) AS tokens,
+                COALESCE(SUM(cost_usd), 0) AS cost_usd,
+                COUNT(*) AS runs
+           FROM runs ${where}
+          GROUP BY service_name
+          ORDER BY cost_usd DESC, tokens DESC`,
+        params as BindParams,
+      );
+
+      const sessions = queryAll<{ key: string; tokens: number; cost_usd: number; runs: number }>(
+        db,
+        `SELECT session_id AS key,
+                COALESCE(SUM(tokens), 0) AS tokens,
+                COALESCE(SUM(cost_usd), 0) AS cost_usd,
+                COUNT(*) AS runs
+           FROM runs ${where} ${where ? "AND" : "WHERE"} session_id IS NOT NULL
+          GROUP BY session_id
+          ORDER BY cost_usd DESC, tokens DESC`,
+        params as BindParams,
+      );
+
+      const total = queryOne<{ tokens: number; cost_usd: number; runs: number }>(
+        db,
+        `SELECT COALESCE(SUM(tokens), 0) AS tokens,
+                COALESCE(SUM(cost_usd), 0) AS cost_usd,
+                COUNT(*) AS runs
+           FROM runs ${where}`,
+        params as BindParams,
+      ) ?? { tokens: 0, cost_usd: 0, runs: 0 };
+
+      return { services, sessions, total };
     },
 
     close(): void {

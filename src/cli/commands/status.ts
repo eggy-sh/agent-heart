@@ -2,6 +2,9 @@ import { Command } from "commander";
 import chalk from "chalk";
 import Table from "cli-table3";
 import { PulseClient } from "../../core/client.js";
+import { buildRunForest, filterForest } from "../../core/tree.js";
+import { renderForest, forestToJson } from "../render-tree.js";
+import { summarizeVerification } from "../../core/verification.js";
 import {
   log,
   chrome,
@@ -25,6 +28,7 @@ export function makeStatusCommand(): Command {
   const status = new Command("status")
     .description("Show current state of all runs and services")
     .option("--service <name>", "Filter by service name")
+    .option("--tree", "Render runs as an orchestration tree (parent → children)")
     .action(async (opts) => {
       const parentOpts = status.parent?.opts() ?? {};
       const jsonOutput = parentOpts.json === true;
@@ -34,6 +38,42 @@ export function makeStatusCommand(): Command {
       });
 
       try {
+        if (opts.tree) {
+          // Build from the full run set so children (which usually have a
+          // different service than their parent) are never severed; --service
+          // then selects which trees to show, keeping each whole.
+          const list = await client.listRuns({ limit: 500 });
+          let forest = buildRunForest(list.runs);
+          if (opts.service) {
+            forest = filterForest(
+              forest,
+              (r) => r.service_name === opts.service,
+            );
+          }
+
+          if (jsonOutput) {
+            log.json({
+              timestamp: new Date().toISOString(),
+              forest: forestToJson(forest),
+            });
+            return;
+          }
+
+          chrome.blank();
+          chrome.log(chalk.bold.cyan("  agent-heart status — tree"));
+          chrome.blank();
+          if (forest.length === 0) {
+            log.dim("  No runs.");
+            chrome.blank();
+            return;
+          }
+          for (const line of renderForest(forest)) {
+            console.log("  " + line);
+          }
+          chrome.blank();
+          return;
+        }
+
         const overview: OverviewResponse = await client.overview();
 
         // If --json, just dump the overview
@@ -71,6 +111,27 @@ export function makeStatusCommand(): Command {
           `  ${chalk.green(runs.active)} active  ${chalk.yellow(runs.stale)} stale  ${chalk.red(runs.dead)} dead  ${chalk.dim(runs.completed + " completed")}  ${chalk.dim(runs.failed + " failed")}`,
         );
         chrome.blank();
+
+        // Verification oversight: surface completed runs still awaiting review.
+        try {
+          const forVerify = await client.listRuns({
+            service: opts.service,
+            limit: 500,
+          });
+          const v = summarizeVerification(forVerify.runs);
+          if (v.pending > 0 || v.failed > 0) {
+            const parts: string[] = [];
+            if (v.pending > 0)
+              parts.push(chalk.yellow(`${v.pending} awaiting verification`));
+            if (v.failed > 0)
+              parts.push(chalk.red(`${v.failed} verification failed`));
+            if (v.passed > 0) parts.push(chalk.dim(`${v.passed} verified`));
+            chrome.log("  " + parts.join("  "));
+            chrome.blank();
+          }
+        } catch {
+          // Non-fatal — verification summary is best-effort.
+        }
 
         // Services table
         let services = overview.services;

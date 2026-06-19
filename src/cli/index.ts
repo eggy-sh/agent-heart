@@ -9,6 +9,9 @@ import { makeInitCommand } from "./commands/init.js";
 import { makeHookCommand } from "./commands/hook.js";
 import { makeRunsCommand } from "./commands/runs.js";
 import { makeOverviewCommand } from "./commands/overview.js";
+import { makeSpendCommand } from "./commands/spend.js";
+import { makeWatchCommand } from "./commands/watch.js";
+import { makeVerifyCommand } from "./commands/verify.js";
 import { makeGwsCommand } from "./commands/gws.js";
 
 export function createProgram(): Command {
@@ -34,6 +37,9 @@ export function createProgram(): Command {
   program.addCommand(makeHookCommand());
   program.addCommand(makeRunsCommand());
   program.addCommand(makeOverviewCommand());
+  program.addCommand(makeSpendCommand());
+  program.addCommand(makeWatchCommand());
+  program.addCommand(makeVerifyCommand());
   program.addCommand(makeGwsCommand());
 
   return program;

@@ -6,6 +6,7 @@ import type {
   OverviewResponse,
   Run,
   RunListResponse,
+  SpendResponse,
 } from "./models.js";
 import { getServerUrl, loadConfig } from "./config.js";
 
@@ -98,6 +99,33 @@ export class PulseClient {
     return this.request<Run>(`/api/v1/runs/${runId}`);
   }
 
+  /** Fetch a run plus all of its descendants (root first). */
+  async getRunTree(runId: string): Promise<RunListResponse> {
+    return this.request<RunListResponse>(`/api/v1/runs/${runId}/tree`);
+  }
+
+  /** Like getRun, but returns null for a missing run (404) instead of throwing,
+   *  so callers can tell "not found" apart from a real connection failure. */
+  async getRunOrNull(runId: string): Promise<Run | null> {
+    try {
+      return await this.getRun(runId);
+    } catch (err) {
+      if (err instanceof Error && /\bHTTP 404\b/.test(err.message)) return null;
+      throw err;
+    }
+  }
+
+  /** Record an oversight verdict on a run (passed/failed). */
+  async verify(
+    runId: string,
+    body: { status: "passed" | "failed"; message?: string },
+  ): Promise<Run> {
+    return this.request<Run>(`/api/v1/runs/${runId}/verify`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
   async listRuns(params?: {
     service?: string;
     status?: string;
@@ -118,6 +146,18 @@ export class PulseClient {
 
   async overview(): Promise<OverviewResponse> {
     return this.request<OverviewResponse>("/api/v1/overview");
+  }
+
+  /** Token/cost spend aggregated per service and session, with budget status. */
+  async spend(params?: {
+    service?: string;
+    session?: string;
+  }): Promise<SpendResponse> {
+    const query = new URLSearchParams();
+    if (params?.service) query.set("service", params.service);
+    if (params?.session) query.set("session", params.session);
+    const qs = query.toString();
+    return this.request<SpendResponse>(`/api/v1/spend${qs ? `?${qs}` : ""}`);
   }
 
   // Context manager pattern for tracking runs

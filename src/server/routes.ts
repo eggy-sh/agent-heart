@@ -7,7 +7,10 @@ import type {
   HeartbeatResponse,
   OverviewResponse,
   RunListResponse,
+  SpendResponse,
+  ServiceSpend,
 } from "../core/models.js";
+import { evaluateBudget } from "../core/budget.js";
 import type { PulseDB } from "./db.js";
 
 export function createApp(db: PulseDB): Hono {
@@ -90,6 +93,8 @@ export function createApp(db: PulseDB): Hono {
             status: newStatus,
             ...(req.message !== undefined && { message: req.message }),
             ...(req.tool_name !== undefined && { tool_name: req.tool_name }),
+            ...(req.tokens !== undefined && { tokens: req.tokens }),
+            ...(req.cost_usd !== undefined && { cost_usd: req.cost_usd }),
             ...(req.metadata !== undefined && { metadata: req.metadata }),
           });
 
@@ -152,6 +157,8 @@ export function createApp(db: PulseDB): Hono {
             completed_at: now,
             last_heartbeat: now,
             ...(req.message !== undefined && { message: req.message }),
+            ...(req.tokens !== undefined && { tokens: req.tokens }),
+            ...(req.cost_usd !== undefined && { cost_usd: req.cost_usd }),
             ...(req.metadata !== undefined && { metadata: req.metadata }),
           });
 
@@ -249,6 +256,44 @@ export function createApp(db: PulseDB): Hono {
         services,
         runs: counts,
         endpoints: [], // Endpoint checks are a future enhancement
+      };
+
+      return c.json(response);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Internal error";
+      return c.json({ ok: false, error: message }, 500);
+    }
+  });
+
+  // --- Spend / budgets ---
+  app.get("/api/v1/spend", (c) => {
+    try {
+      const service = c.req.query("service");
+      const session = c.req.query("session");
+      const spend = db.getSpend({
+        service: service || undefined,
+        session: session || undefined,
+      });
+
+      const services: ServiceSpend[] = spend.services.map((s) => {
+        const cfg = db.getService(s.key);
+        const budget = evaluateBudget(
+          { tokens: s.tokens, cost_usd: s.cost_usd },
+          { tokens: cfg?.budget_tokens, cost_usd: cfg?.budget_usd },
+        );
+        return {
+          ...s,
+          budget_tokens: cfg?.budget_tokens ?? null,
+          budget_usd: cfg?.budget_usd ?? null,
+          budget,
+        };
+      });
+
+      const response: SpendResponse = {
+        timestamp: new Date().toISOString(),
+        total: spend.total,
+        services,
+        sessions: spend.sessions,
       };
 
       return c.json(response);

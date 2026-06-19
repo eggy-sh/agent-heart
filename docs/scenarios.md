@@ -309,6 +309,52 @@ A stuck leaf bubbles up: the orchestrator row is annotated `⚠ subtree warning`
 
 ---
 
+## 7. A Self-Halting Loop on a Budget
+
+You run a self-prompting agent loop overnight. It's productive — and it burns tokens fast. You want it to stop itself if it crosses a dollar limit rather than waking up to a drained account.
+
+### Set a budget
+
+```json
+// ~/.agent-heart/config.json
+{ "services": [ { "name": "claude", "expected_cycle_ms": 120000, "max_silence_ms": 300000, "budget_usd": 20.00 } ] }
+```
+
+### Report spend each iteration
+
+After each model turn, the agent reports its cumulative tokens and cost (the latest value wins):
+
+```bash
+npx agent-heart beat claude --run-id "$RUN" --tokens "$TOKENS" --cost "$COST"
+```
+
+### Let the loop check itself
+
+At the top of each iteration, the loop asks agent-heart whether it's still within budget. `spend --fail-over-budget` exits non-zero when the service is over budget:
+
+```bash
+while true; do
+  npx agent-heart spend --service claude --fail-over-budget || {
+    echo "Budget reached — stopping the loop."; break;
+  }
+  ./run-one-iteration.sh
+done
+```
+
+### See where the money went
+
+```bash
+npx agent-heart spend
+```
+
+```
+  claude   1.8M   $19.40   $19.40/$20.00 ██████████ 97%   142
+```
+
+The agent manages its own limit — no babysitting, no surprise bill.
+
+---
+
 ## Naming Convention
 
 Services follow a `<runtime>/<tool_or_family>` pattern:

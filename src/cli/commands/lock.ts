@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { PulseClient } from "../../core/client.js";
 import { PARENT_RUN_ID_ENV, resolveParentRunId } from "../../core/parentage.js";
+import { parseIntArg, parseFloatArg } from "../parse.js";
 import { log } from "../../utils/logger.js";
 
 export function makeLockCommand(): Command {
@@ -15,6 +16,8 @@ export function makeLockCommand(): Command {
       "--parent <run-id>",
       `Parent run ID for orchestration trees (defaults to $${PARENT_RUN_ID_ENV})`,
     )
+    .option("--tokens <n>", "Initial tokens used by this run", parseIntArg)
+    .option("--cost <usd>", "Initial cost (USD) of this run", parseFloatArg)
     .option("--metadata <json>", "Additional metadata as JSON string")
     .action(async (service: string, opts) => {
       const parentOpts = lock.parent?.opts() ?? {};
@@ -41,6 +44,8 @@ export function makeLockCommand(): Command {
           resource_kind: opts.resource,
           message: opts.message,
           parent_run_id: resolveParentRunId(opts.parent),
+          ...(opts.tokens !== undefined && { tokens: opts.tokens }),
+          ...(opts.cost !== undefined && { cost_usd: opts.cost }),
           metadata,
         });
 

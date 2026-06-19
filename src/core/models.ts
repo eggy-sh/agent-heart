@@ -47,6 +47,8 @@ export interface Run {
   message: string | null;
   exit_code: number | null;
   duration_ms: number | null;
+  tokens: number | null;
+  cost_usd: number | null;
   started_at: string;
   last_heartbeat: string;
   completed_at: string | null;
@@ -92,6 +94,8 @@ export const HeartbeatRequestSchema = z.object({
   resource_id: z.string().optional(),
   message: z.string().optional(),
   exit_code: z.number().int().optional(),
+  tokens: z.number().int().nonnegative().optional(),
+  cost_usd: z.number().nonnegative().optional(),
   metadata: z.record(z.string()).optional(),
 });
 
@@ -124,6 +128,42 @@ export interface RunListResponse {
   total: number;
 }
 
+// --- Spend / budgets ---
+
+export interface BudgetMetric {
+  used: number;
+  limit: number | null;
+  pct: number | null;
+  severity: Severity;
+}
+
+export interface BudgetEval {
+  tokens: BudgetMetric;
+  cost_usd: BudgetMetric;
+  severity: Severity;
+}
+
+export interface SpendScope {
+  /** service_name or session_id depending on the grouping */
+  key: string;
+  tokens: number;
+  cost_usd: number;
+  runs: number;
+}
+
+export interface ServiceSpend extends SpendScope {
+  budget_tokens: number | null;
+  budget_usd: number | null;
+  budget: BudgetEval;
+}
+
+export interface SpendResponse {
+  timestamp: string;
+  total: { tokens: number; cost_usd: number; runs: number };
+  services: ServiceSpend[];
+  sessions: SpendScope[];
+}
+
 // --- Configuration ---
 
 export interface ServiceConfig {
@@ -131,6 +171,8 @@ export interface ServiceConfig {
   expected_cycle_ms: number;
   max_silence_ms: number;
   endpoints?: EndpointConfig[];
+  budget_tokens?: number;
+  budget_usd?: number;
 }
 
 export interface EndpointConfig {

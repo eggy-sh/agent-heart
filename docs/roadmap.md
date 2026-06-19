@@ -12,6 +12,7 @@
 - Session and run correlation
 - Duration and failure categorization
 - Stale/dead classification tuning
+- Token/cost spend tracking with per-service budgets and self-halt (`spend --fail-over-budget`) ✅
 
 ## Phase 3: Hook Integrations
 

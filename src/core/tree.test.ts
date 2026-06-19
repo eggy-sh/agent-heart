@@ -27,6 +27,8 @@ function makeRun(
     message: null,
     exit_code: null,
     duration_ms: null,
+    tokens: null,
+    cost_usd: null,
     started_at: opts.started_at ?? "2026-06-18T00:00:00.000Z",
     last_heartbeat: opts.started_at ?? "2026-06-18T00:00:00.000Z",
     completed_at: null,

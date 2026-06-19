@@ -44,6 +44,8 @@ That is the gap `agent-heart` is built to fill.
 
 **Orchestration trees** -- when an agent spins up sub-tasks, they form a parent/child tree. `status --tree` shows the whole hierarchy and bubbles a stuck or dead leaf up to the root. Sub-tasks attach automatically in any harness -- no run-id wiring.
 
+**Cost & token budgets** -- report tokens and dollars per run, see spend rolled up per session and service, set budgets, and let a loop **self-halt** when it crosses a limit (`spend --fail-over-budget` exits non-zero). Autonomous loops burn tokens fast; this keeps them on a leash.
+
 **Universal CLI wrapper** -- wrap any command with `npx agent-heart exec` and get automatic lifecycle tracking, duration capture, and exit code recording. No code changes required.
 
 ```
@@ -148,6 +150,42 @@ npx agent-heart status --tree
 ```
 
 A stuck or dead leaf bubbles a `⚠ subtree` annotation up to the root, so one glance tells you which branch is in trouble. `runs --tree` renders the same way; `--json` returns the nested structure for an agent loop to act on. Remote callers can pull a subtree via `GET /api/v1/runs/:id/tree`, and SDK users get `client.getRunTree(runId)` plus the pure `buildRunForest(runs)` helper.
+
+### `spend` -- Cost & Token Budgets
+
+Autonomous loops burn tokens far faster than hand-prompting. Report usage as the agent works, then watch spend and cap it.
+
+```bash
+# Report cumulative tokens/cost as the run progresses (latest value wins)
+npx agent-heart beat claude --run-id run_k7xPm2 --tokens 180000 --cost 0.70
+npx agent-heart unlock claude --run-id run_k7xPm2 --tokens 240000 --cost 0.95 --exit-code 0
+```
+
+Set budgets per service in `~/.agent-heart/config.json`:
+
+```json
+{ "services": [ { "name": "claude", "expected_cycle_ms": 120000, "max_silence_ms": 300000, "budget_usd": 5.00, "budget_tokens": 2000000 } ] }
+```
+
+```bash
+npx agent-heart spend                  # spend per service + session, with budget bars
+npx agent-heart spend --session loop-1  # one loop's spend
+npx agent-heart spend --json            # machine-readable, includes over_budget[]
+```
+
+```
+  claude   330.0k   $1.25   $1.25/$1.00 ██████████ 125%   2
+  cheap    5.0k     $0.05   $0.05/$10.00 ░░░░░░░░░░ 1%     1
+```
+
+**Self-halting loops** — `spend --fail-over-budget` exits non-zero when any shown service is over budget, so the loop stops itself instead of draining the account:
+
+```bash
+# Inside an agent loop: stop early if we've blown the budget
+npx agent-heart spend --service claude --fail-over-budget || exit 0
+```
+
+SDK: `client.spend({ service, session })`, plus the pure `evaluateBudget(used, limit)` / `isOverBudget(eval)` helpers exported from the package root.
 
 ### `server start` / `init`
 

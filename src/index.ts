@@ -15,8 +15,14 @@ export type {
   ExecResult,
   PulseConfig,
   Severity,
+  SpendResponse,
+  ServiceSpend,
+  SpendScope,
+  BudgetEval,
+  BudgetMetric,
 } from "./core/models.js";
 export { loadConfig, getServerUrl } from "./core/config.js";
 export { buildRunForest, severityRank } from "./core/tree.js";
 export type { RunTreeNode } from "./core/tree.js";
 export { PARENT_RUN_ID_ENV, resolveParentRunId } from "./core/parentage.js";
+export { evaluateBudget, isOverBudget } from "./core/budget.js";

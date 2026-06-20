@@ -50,9 +50,7 @@ export function ensureConfigDir(): void {
   }
 }
 
-export function loadConfig(): PulseConfig {
-  const configPath = getConfigPath();
-
+export function loadConfig(configPath: string = getConfigPath()): PulseConfig {
   if (!existsSync(configPath)) {
     return { ...DEFAULT_CONFIG };
   }

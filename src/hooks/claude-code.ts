@@ -108,7 +108,7 @@ function summarizeToolInput(
  * Extract a command string from tool input.
  * For Bash tools, this is the command. For file tools, this is the file path.
  */
-function extractCommand(
+export function extractCommand(
   toolName: string,
   toolInput: Record<string, unknown> | undefined,
 ): string | undefined {
@@ -133,7 +133,7 @@ function extractCommand(
 /**
  * Determine the command family from the tool name.
  */
-function commandFamily(toolName: string): string {
+export function commandFamily(toolName: string): string {
   const lower = toolName.toLowerCase();
   if (lower === "bash") return "shell";
   if (["read", "write", "edit", "glob", "grep"].includes(lower))

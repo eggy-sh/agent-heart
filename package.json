@@ -29,6 +29,7 @@
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "acceptance": "npm run build && node scripts/acceptance.mjs",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

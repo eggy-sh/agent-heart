@@ -22,7 +22,8 @@ async function readStdinWithTimeout(timeoutMs = 5000): Promise<string> {
       resolve(Buffer.concat(chunks).toString("utf-8"));
     }, timeoutMs);
 
-    process.stdin.setEncoding("utf-8");
+    // Collect raw Buffers (no setEncoding) so Buffer.concat is valid and a
+    // multibyte char split across chunks decodes correctly once at the end.
     process.stdin.on("data", (chunk: Buffer) => chunks.push(chunk));
     process.stdin.on("end", () => {
       clearTimeout(timer);

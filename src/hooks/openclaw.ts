@@ -487,7 +487,8 @@ async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
 
   return new Promise((resolve, reject) => {
-    process.stdin.setEncoding("utf-8");
+    // Collect raw Buffers (no setEncoding) so Buffer.concat is valid and a
+    // multibyte char split across chunks decodes correctly once at the end.
     process.stdin.on("data", (chunk: Buffer) => chunks.push(chunk));
     process.stdin.on("end", () =>
       resolve(Buffer.concat(chunks).toString("utf-8")),
